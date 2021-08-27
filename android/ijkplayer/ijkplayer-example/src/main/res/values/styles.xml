@@ -5,7 +5,7 @@
     </style>
 
     <style name="Theme.App.Light.NoActionBar" parent="Theme.AppCompat.Light.NoActionBar">
-        <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
+<!--        <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>-->
 
         <item name="actionButtonStyle">@style/Widget.App.ActionButton</item>
     </style>

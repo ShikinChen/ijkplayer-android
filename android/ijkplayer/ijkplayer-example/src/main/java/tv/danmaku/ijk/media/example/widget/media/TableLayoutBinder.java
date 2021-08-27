@@ -18,12 +18,13 @@
 package tv.danmaku.ijk.media.example.widget.media;
 
 import android.content.Context;
-import android.support.v7.app.AlertDialog;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TableLayout;
 import android.widget.TextView;
+
+import androidx.appcompat.app.AlertDialog;
 
 import tv.danmaku.ijk.media.example.R;
 

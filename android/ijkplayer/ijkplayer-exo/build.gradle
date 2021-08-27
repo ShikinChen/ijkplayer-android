@@ -12,7 +12,7 @@ android {
         abortOnError false
     }
     defaultConfig {
-        minSdkVersion 26
+        minSdkVersion 25
         targetSdkVersion rootProject.ext.targetSdkVersion
     }
     buildTypes {
@@ -26,8 +26,8 @@ android {
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 
-    implementation 'com.google.android.exoplayer:exoplayer:r1.5.11'
-
+//    implementation 'com.google.android.exoplayer:exoplayer:r1.5.11'
+    implementation project(":ExoPlayer:library")
     implementation project(':ijkplayer-java')
     // implementation 'tv.danmaku.ijk.media:ijkplayer-java:0.8.8'
 }

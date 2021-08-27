@@ -118,7 +118,7 @@ elif [ "$FF_ARCH" = "x86" ]; then
     FF_CROSS_PREFIX=i686-linux-android
     FF_TOOLCHAIN_NAME=x86-${FF_GCC_VER}
 
-    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=x86 --cpu=i686 --enable-yasm"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=x86 --cpu=i686 --enable-x86asm"
 
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -march=atom -msse3 -ffast-math -mfpmath=sse"
     FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS"
@@ -136,7 +136,7 @@ elif [ "$FF_ARCH" = "x86_64" ]; then
     FF_CROSS_PREFIX=x86_64-linux-android
     FF_TOOLCHAIN_NAME=${FF_CROSS_PREFIX}-${FF_GCC_64_VER}
 
-    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=x86_64 --enable-yasm"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=x86_64 --enable-x86asm"
 
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS"
     FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS"
@@ -154,7 +154,7 @@ elif [ "$FF_ARCH" = "arm64" ]; then
     FF_CROSS_PREFIX=aarch64-linux-android
     FF_TOOLCHAIN_NAME=${FF_CROSS_PREFIX}-${FF_GCC_64_VER}
 
-    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=aarch64 --enable-yasm"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=aarch64 --enable-x86asm"
 
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS"
     FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS"

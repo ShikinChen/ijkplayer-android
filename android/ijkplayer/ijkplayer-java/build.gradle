@@ -13,6 +13,11 @@ android {
     defaultConfig {
         minSdkVersion 25
         targetSdkVersion rootProject.ext.targetSdkVersion
+        externalNativeBuild {
+            cmake {
+                cppFlags "-frtti -fexceptions"
+            }
+        }
     }
     buildTypes {
         release {
@@ -20,6 +25,13 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    externalNativeBuild {
+        cmake {
+            path "../../../CMakeLists.txt"
+            version "3.10.2"
+        }
+    }
+    ndkVersion '22.0.7026061'
 }
 
 dependencies {

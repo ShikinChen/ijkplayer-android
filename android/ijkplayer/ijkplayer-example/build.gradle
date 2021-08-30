@@ -57,7 +57,7 @@ dependencies {
 
 //    all64Implementation project(':ijkplayer-armv5')
 //    all64Implementation project(':ijkplayer-armv7a')
-    all64Implementation project(':ijkplayer-arm64')
+//    all64Implementation project(':ijkplayer-arm64')
 //    all64Implementation project(':ijkplayer-x86')
 //    all64Implementation project(':ijkplayer-x86_64')
 

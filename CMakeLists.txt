@@ -5,13 +5,6 @@ project(ijkplayer)
 add_definitions(-DNDEBUG)
 
 set(IJKMEDIA_PATH ${CMAKE_SOURCE_DIR}/ijkmedia)
-set(IJKJ4A_PATH ${IJKMEDIA_PATH}/ijkj4a)
-set(IJKSDL_PATH ${IJKMEDIA_PATH}/ijksdl)
-set(IJKMEDIA_PATH ${CMAKE_SOURCE_DIR}/ijkmedia)
-set(IJKJ4A_PATH ${IJKMEDIA_PATH}/ijkj4a)
-set(IJKPLAYER_PATH ${IJKMEDIA_PATH}/ijkplayer)
-set(IJKYUV_PATH ${IJKMEDIA_PATH}/ijkyuv)
-set(IJKSOUNDTOUCH_PATH ${IJKMEDIA_PATH}/ijksoundtouch)
 
 set(ABI "arm64")
 if (${ANDROID_ABI} STREQUAL armeabi-v7a)
@@ -38,7 +31,4 @@ set_target_properties(ijkffmpeg
         ${FFMPEG_ABI_PATH}/include
         )
 
-add_subdirectory(ijkmedia)
-
-add_subdirectory(android/ijkplayer/ijkplayer-java/src/main/cpp)
-
+add_subdirectory(cmake/ijkmedia)

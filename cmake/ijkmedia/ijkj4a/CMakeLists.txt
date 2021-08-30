@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.4.1)
 project("ijkj4a")
 
+set(IJKJ4A_PATH ${IJKMEDIA_PATH}/ijkj4a)
+
 file(GLOB CPP_FILE_PATH
         #ijkj4a
         ${IJKJ4A_PATH}/j4a/*.c

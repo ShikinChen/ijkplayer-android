@@ -239,7 +239,12 @@ IjkMediaPlayer_setAndroidIOCallback(JNIEnv *env, jobject thiz, jobject callback)
 LABEL_RETURN:
     ijkmp_dec_ref_p(&mp);
 }
-
+/**
+ * MARK 设置Surface
+ * @param env
+ * @param thiz
+ * @param jsurface
+ */
 static void
 IjkMediaPlayer_setVideoSurface(JNIEnv *env, jobject thiz, jobject jsurface)
 {
@@ -253,7 +258,11 @@ LABEL_RETURN:
     ijkmp_dec_ref_p(&mp);
     return;
 }
-
+/**
+ * MARK 异步准备
+ * @param env
+ * @param thiz
+ */
 static void
 IjkMediaPlayer_prepareAsync(JNIEnv *env, jobject thiz)
 {
@@ -525,7 +534,14 @@ LABEL_RETURN:
     ijkmp_dec_ref_p(&mp);
     return audio_session_id;
 }
-
+/**
+ * MARK 播放器配置
+ * @param env
+ * @param thiz
+ * @param category
+ * @param name
+ * @param value
+ */
 static void
 IjkMediaPlayer_setOption(JNIEnv *env, jobject thiz, jint category, jobject name, jobject value)
 {
@@ -745,7 +761,12 @@ IjkMediaPlayer_native_init(JNIEnv *env)
 {
     MPTRACE("%s\n", __func__);
 }
-
+/**
+ * MARK 初始化播放器
+ * @param env
+ * @param thiz
+ * @param weak_this java层MediaPlayer播放器弱引用
+ */
 static void
 IjkMediaPlayer_native_setup(JNIEnv *env, jobject thiz, jobject weak_this)
 {
@@ -754,7 +775,9 @@ IjkMediaPlayer_native_setup(JNIEnv *env, jobject thiz, jobject weak_this)
     JNI_CHECK_GOTO(mp, env, "java/lang/OutOfMemoryError", "mpjni: native_setup: ijkmp_create() failed", LABEL_RETURN);
 
     jni_set_media_player(env, thiz, mp);
+    //MARK 设置native层MediaPlayer的java层MediaPlayer播放器实例
     ijkmp_set_weak_thiz(mp, (*env)->NewGlobalRef(env, weak_this));
+	//MARK 设置native层ff播放器的java层MediaPlayer播放器实例
     ijkmp_set_inject_opaque(mp, ijkmp_get_weak_thiz(mp));
     ijkmp_set_ijkio_inject_opaque(mp, ijkmp_get_weak_thiz(mp));
     ijkmp_android_set_mediacodec_select_callback(mp, mediacodec_select_callback, ijkmp_get_weak_thiz(mp));
@@ -777,6 +800,7 @@ inject_callback(void *opaque, int what, void *data, size_t data_size)
     JNIEnv     *env     = NULL;
     jobject     jbundle = NULL;
     int         ret     = -1;
+    //MARK 从sdl获取env
     SDL_JNI_SetupThreadEnv(&env);
 
     jobject weak_thiz = (jobject) opaque;
@@ -788,7 +812,7 @@ inject_callback(void *opaque, int what, void *data, size_t data_size)
         case AVAPP_CTRL_WILL_CONCAT_SEGMENT_OPEN: {
             AVAppIOControl *real_data = (AVAppIOControl *)data;
             real_data->is_handled = 0;
-
+            //MARK 实例化一个Android的Bundle
             jbundle = J4AC_Bundle__Bundle__catchAll(env);
             if (!jbundle) {
                 ALOGE("%s: J4AC_Bundle__Bundle__catchAll failed for case %d\n", __func__, what);
@@ -1195,12 +1219,15 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved)
     pthread_mutex_init(&g_clazz.mutex, NULL );
 
     // FindClass returns LocalReference
+    //MARK 获取IjkMediaPlayer的class
     IJK_FIND_JAVA_CLASS(env, g_clazz.clazz, JNI_CLASS_IJKPLAYER);
+    //MARK 注册IjkMediaPlayer的native方法
     (*env)->RegisterNatives(env, g_clazz.clazz, g_methods, NELEM(g_methods) );
-
+    //MARK 注册ffmpeg 组件和网络 和 自定义模块
     ijkmp_global_init();
+    //MARK 注册检测在线直播流回调
     ijkmp_global_set_inject_callback(inject_callback);
-
+	//MARK 注册FFmpegApi的native方法
     FFmpegApi_global_init(env);
 
     return JNI_VERSION_1_4;

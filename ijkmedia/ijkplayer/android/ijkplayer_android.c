@@ -40,7 +40,7 @@ IjkMediaPlayer *ijkmp_android_create(int(*msg_loop)(void*))
     mp->ffplayer->vout = SDL_VoutAndroid_CreateForAndroidSurface();
     if (!mp->ffplayer->vout)
         goto fail;
-
+    //MARK 初始化ff播放器sdl管道
     mp->ffplayer->pipeline = ffpipeline_create_from_android(mp->ffplayer);
     if (!mp->ffplayer->pipeline)
         goto fail;
@@ -53,16 +53,27 @@ fail:
     ijkmp_dec_ref_p(&mp);
     return NULL;
 }
-
+/**
+ * MARK Android的surface跟sdl绑定 设置ff播放器sdl管道的Android的surface
+ * @param env
+ * @param mp
+ * @param android_surface
+ */
 void ijkmp_android_set_surface_l(JNIEnv *env, IjkMediaPlayer *mp, jobject android_surface)
 {
     if (!mp || !mp->ffplayer || !mp->ffplayer->vout)
         return;
 
     SDL_VoutAndroid_SetAndroidSurface(env, mp->ffplayer->vout, android_surface);
+    //MARK 设置ff播放器sdl管道的Android的surface
     ffpipeline_set_surface(env, mp->ffplayer->pipeline, android_surface);
 }
-
+/**
+ * MARK 设置Android的surface
+ * @param env
+ * @param mp
+ * @param android_surface
+ */
 void ijkmp_android_set_surface(JNIEnv *env, IjkMediaPlayer *mp, jobject android_surface)
 {
     if (!mp)

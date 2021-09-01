@@ -3024,7 +3024,9 @@ out:
 
     return ret;
 }
-
+/**
+ * MARK 控制解码是否终止回调
+ */
 static int decode_interrupt_cb(void *ctx)
 {
     VideoState *is = ctx;
@@ -3096,7 +3098,9 @@ static int read_thread(void *arg)
         ret = AVERROR(ENOMEM);
         goto fail;
     }
+    //MARK 控制ffmpeg终止回调
     ic->interrupt_callback.callback = decode_interrupt_cb;
+	//MARK 控制ffmpeg终止回调的入参 VideoState
     ic->interrupt_callback.opaque = is;
     if (!av_dict_get(ffp->format_opts, "scan_all_pmts", NULL, AV_DICT_MATCH_CASE)) {
         av_dict_set(&ffp->format_opts, "scan_all_pmts", "1", AV_DICT_DONT_OVERWRITE);
@@ -3119,6 +3123,7 @@ static int read_thread(void *arg)
 
     av_dict_set_intptr(&ffp->format_opts, "video_cache_ptr", (intptr_t)&ffp->stat.video_cache, 0);
     av_dict_set_intptr(&ffp->format_opts, "audio_cache_ptr", (intptr_t)&ffp->stat.audio_cache, 0);
+    //MARK 如果is->filename为ijklas寻找b站ijklas的自定义demuxer
     err = avformat_open_input(&ic, is->filename, is->iformat, &ffp->format_opts);
     if (err < 0) {
         print_error(is->filename, err);
@@ -3639,6 +3644,13 @@ static int read_thread(void *arg)
 }
 
 static int video_refresh_thread(void *arg);
+/**
+ * MARK 打开播放源生成流
+ * @param ffp
+ * @param filename
+ * @param iformat
+ * @return
+ */
 static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputFormat *iformat)
 {
     assert(!ffp->is);
@@ -3655,6 +3667,7 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
     is->xleft   = 0;
 #if defined(__ANDROID__)
     if (ffp->soundtouch_enable) {
+        //MARK 创建soundtouch音源处理库
         is->handle = ijk_soundtouch_create();
     }
 #endif
@@ -3705,7 +3718,7 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
     is->accurate_seek_mutex = SDL_CreateMutex();
     ffp->is = is;
     is->pause_req = !ffp->start_on_prepared;
-
+	//MARK 创建ff读取帧线程并且启动
     is->video_refresh_tid = SDL_CreateThreadEx(&is->_video_refresh_tid, video_refresh_thread, ffp, "ff_vout");
     if (!is->video_refresh_tid) {
         av_freep(&ffp->is);
@@ -3713,6 +3726,7 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
     }
 
     is->initialized_decoder = 0;
+    //MARK 创建初始化ffmpeg线程并且启动
     is->read_tid = SDL_CreateThreadEx(&is->_read_tid, read_thread, ffp, "ff_read");
     if (!is->read_tid) {
         av_log(NULL, AV_LOG_FATAL, "SDL_CreateThread(): %s\n", SDL_GetError());
@@ -3977,9 +3991,12 @@ static const char *ijk_version_info()
 {
     return IJKPLAYER_VERSION;
 }
-
+/**
+ * MARK 创建FF播放器
+ */
 FFPlayer *ffp_create()
 {
+    //MARK 打印ffmpeg版本和B站播放器版本
     av_log(NULL, AV_LOG_INFO, "av_version_info: %s\n", av_version_info());
     av_log(NULL, AV_LOG_INFO, "ijk_version_info: %s\n", ijk_version_info());
 
@@ -4050,7 +4067,14 @@ static AVDictionary **ffp_get_opt_dict(FFPlayer *ffp, int opt_category)
             return NULL;
     }
 }
-
+/**
+ * MARK hook ffmpeg的直播流协议
+ * @param h
+ * @param message
+ * @param data
+ * @param size
+ * @return
+ */
 static int app_func_event(AVApplicationContext *h, int message ,void *data, size_t size)
 {
     if (!h || !h->opaque || !data)

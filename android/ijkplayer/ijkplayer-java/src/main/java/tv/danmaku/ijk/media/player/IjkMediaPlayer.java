@@ -326,7 +326,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     /**
-     * Sets the data source as a content Uri.
+     * Sets the data source as a content Uri. MARK 设置播放数据源
      *
      * @param context the Context to use when resolving the Uri
      * @param uri the Content URI of the data you want to play

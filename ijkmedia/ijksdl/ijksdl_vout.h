@@ -58,6 +58,9 @@ struct SDL_VoutOverlay {
 };
 
 typedef struct SDL_Vout_Opaque SDL_Vout_Opaque;
+/*
+ * MARK SDL输出
+ */
 typedef struct SDL_Vout SDL_Vout;
 struct SDL_Vout {
     SDL_mutex *mutex;

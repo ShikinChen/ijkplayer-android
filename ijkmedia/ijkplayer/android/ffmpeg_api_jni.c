@@ -81,8 +81,9 @@ static JNINativeMethod g_methods[] = {
 int FFmpegApi_global_init(JNIEnv *env)
 {
     int ret = 0;
-
+    //MARK 获取java层FFmpegApi的class
     IJK_FIND_JAVA_CLASS(env, g_clazz.clazz, JNI_CLASS_FFMPEG_API);
+    //MARK 注册FFmpegApi类的native方法
     (*env)->RegisterNatives(env, g_clazz.clazz, g_methods, NELEM(g_methods));
 
     return ret;

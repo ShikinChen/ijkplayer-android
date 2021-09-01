@@ -113,13 +113,17 @@ void ijkmp_change_state_l(IjkMediaPlayer *mp, int new_state)
     mp->mp_state = new_state;
     ffp_notify_msg1(mp->ffplayer, FFP_MSG_PLAYBACK_STATE_CHANGED);
 }
-
+/**
+ * MARK 创建播放器实例
+ * @param msg_loop
+ * @return
+ */
 IjkMediaPlayer *ijkmp_create(int (*msg_loop)(void*))
 {
     IjkMediaPlayer *mp = (IjkMediaPlayer *) mallocz(sizeof(IjkMediaPlayer));
     if (!mp)
         goto fail;
-
+    //MARK 创建ff播放器
     mp->ffplayer = ffp_create();
     if (!mp->ffplayer)
         goto fail;

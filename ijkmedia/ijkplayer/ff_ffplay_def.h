@@ -276,6 +276,7 @@ typedef struct VideoState {
     SDL_Thread *read_tid;
     SDL_Thread _read_tid;
     AVInputFormat *iformat;
+    //MARK 终止解码请求
     int abort_request;
     int force_refresh;
     int paused;
@@ -370,7 +371,7 @@ typedef struct VideoState {
     struct SwsContext *sub_convert_ctx;
 #endif
     int eof;
-
+    //MARK 播放源地址
     char *filename;
     int width, height, xleft, ytop;
     int step;
@@ -556,12 +557,14 @@ typedef struct FFPlayer {
     const AVClass *av_class;
 
     /* ffplay context */
+    //MARK 输入源
     VideoState *is;
 
     /* format/codec options */
     AVDictionary *format_opts;
     AVDictionary *codec_opts;
     AVDictionary *sws_dict;
+    //MARK 播放器配置
     AVDictionary *player_opts;
     AVDictionary *swr_opts;
     AVDictionary *swr_preset_opts;
@@ -570,6 +573,7 @@ typedef struct FFPlayer {
 #ifdef FFP_MERGE
     AVInputFormat *file_iformat;
 #endif
+    //MARK 播放源地址
     char *input_filename;
 #ifdef FFP_MERGE
     const char *window_title;
@@ -635,6 +639,7 @@ typedef struct FFPlayer {
     /* extra fields */
     SDL_Aout *aout;
     SDL_Vout *vout;
+    //MARK 管道
     struct IJKFF_Pipeline *pipeline;
     struct IJKFF_Pipenode *node_vdec;
     int sar_num;
@@ -700,8 +705,9 @@ typedef struct FFPlayer {
     int         pf_playback_rate_changed;
     float       pf_playback_volume;
     int         pf_playback_volume_changed;
-
+    //MARK java层播放器MediaPlayer实例
     void               *inject_opaque;
+    //MARK java层播放器MediaPlayer实例
     void               *ijkio_inject_opaque;
     FFStatistic         stat;
     FFDemuxCacheControl dcc;
@@ -724,7 +730,9 @@ typedef struct FFPlayer {
 
 #define fftime_to_milliseconds(ts) (av_rescale(ts, 1000, AV_TIME_BASE))
 #define milliseconds_to_fftime(ms) (av_rescale(ms, AV_TIME_BASE, 1000))
-
+/**
+ * MARK 重置ff播放器
+ */
 inline static void ffp_reset_internal(FFPlayer *ffp)
 {
     /* ffp->is closed in stream_close() */

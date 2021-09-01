@@ -86,6 +86,7 @@ void ijkav_register_all(void)
     IJK_REGISTER_PROTOCOL(ijkhttphook);
     IJK_REGISTER_PROTOCOL(ijksegment);
     /* demuxers */
+    //MARK demuxer，是音视频文件的一个解封装器 B站自定义 如果url是ijklas 就选择 ijkff_ijklas_demuxer
     IJK_REGISTER_DEMUXER(ijklivehook);
     IJK_REGISTER_DEMUXER(ijklas);
     av_log(NULL, AV_LOG_INFO, "===== custom modules end =====\n");

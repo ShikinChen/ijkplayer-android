@@ -38,6 +38,7 @@ void SDL_VoutAndroid_SetAndroidSurface(JNIEnv *env, SDL_Vout *vout, jobject andr
 {
     ANativeWindow *native_window = NULL;
     if (android_surface) {
+        //MARK 根据Android的Surface获取native_window
         native_window = ANativeWindow_fromSurface(env, android_surface);
         if (!native_window) {
             ALOGE("%s: ANativeWindow_fromSurface: failed\n", __func__);

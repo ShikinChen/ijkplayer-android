@@ -149,6 +149,10 @@ public class TextureRenderView extends TextureView implements IRenderView {
             mSurfaceTextureHost = surfaceTextureHost;
         }
 
+        /**
+         * MARK 将纹理绑定到播放器
+         * @param mp
+         */
         @TargetApi(Build.VERSION_CODES.JELLY_BEAN)
         public void bindToMediaPlayer(IMediaPlayer mp) {
             if (mp == null)

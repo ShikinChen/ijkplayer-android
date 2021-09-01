@@ -27,7 +27,10 @@
 #include <assert.h>
 #include <sys/time.h>
 #include "ijksdl_inc_internal.h"
-
+/**
+ * MARK 创建SDL互斥
+ * @return
+ */
 SDL_mutex *SDL_CreateMutex(void)
 {
     SDL_mutex *mutex;

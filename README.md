@@ -145,6 +145,8 @@ cd android/contrib
 ./compile-ffmpeg.sh clean
 ./compile-ffmpeg.sh all
 
+#执行完compile-ffmpeg.sh arm64 编译完ffmpeg的arm64动态库后 如果开发和调试忽略下面命令直接导入整个项目
+
 cd ..
 ./compile-ijk.sh all
 

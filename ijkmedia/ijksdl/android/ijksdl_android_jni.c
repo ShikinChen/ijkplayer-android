@@ -54,7 +54,11 @@ static void make_thread_key()
 {
     pthread_key_create(&g_thread_key, SDL_JNI_ThreadDestroyed);
 }
-
+/**
+ * MARK 获取env
+ * @param p_env
+ * @return
+ */
 jint SDL_JNI_SetupThreadEnv(JNIEnv **p_env)
 {
     JavaVM *jvm = g_jvm;

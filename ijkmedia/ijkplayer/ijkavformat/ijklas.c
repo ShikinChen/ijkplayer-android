@@ -1784,6 +1784,7 @@ static int las_read_header(AVFormatContext* s) {
     playlist->session_id = c->session_id;
 
     av_dict_set(&c->avio_opts, "timeout", "10000000", 0);
+    //MARK 将manifest_string转为playlist播放列表
     if ((ret = parse_root(c->manifest_string, playlist)) < 0) {
         log_error("Illegal manifest Json String");
         goto fail;

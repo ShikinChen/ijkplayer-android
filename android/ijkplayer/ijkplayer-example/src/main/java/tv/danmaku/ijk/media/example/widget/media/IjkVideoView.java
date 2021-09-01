@@ -221,7 +221,7 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
             case RENDER_NONE:
                 setRenderView(null);
                 break;
-            case RENDER_TEXTURE_VIEW: {
+            case RENDER_TEXTURE_VIEW: {//MARK 纹理渲染方式
                 TextureRenderView renderView = new TextureRenderView(getContext());
                 if (mMediaPlayer != null) {
                     renderView.getSurfaceHolder().bindToMediaPlayer(mMediaPlayer);
@@ -320,6 +320,7 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
         am.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
 
         try {
+            //MARK 创建播放器
             mMediaPlayer = createPlayer(mSettings.getPlayer());
 
             // TODO: create SubtitleController in MediaPlayer, but we need
@@ -385,6 +386,9 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
         attachMediaController();
     }
 
+    /**
+     * MARK 播放器控制器
+     */
     private void attachMediaController() {
         if (mMediaPlayer != null && mMediaController != null) {
             mMediaController.setMediaPlayer(this);
@@ -1035,7 +1039,7 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
                 mediaPlayer = androidMediaPlayer;
             }
             break;
-            case Settings.PV_PLAYER__IjkMediaPlayer:
+            case Settings.PV_PLAYER__IjkMediaPlayer://MARK 创建b站播放器
             default: {
                 IjkMediaPlayer ijkMediaPlayer = null;
                 if (mUri != null) {
@@ -1045,6 +1049,7 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
                     if (mManifestString != null) {
                         ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "iformat", "ijklas");
                         ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "find_stream_info", 0);
+                        //MARK 播放源配置
                         ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "manifest_string", mManifestString);
                     }
                     if (mSettings.getUsingMediaCodec()) {

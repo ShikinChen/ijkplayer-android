@@ -325,7 +325,14 @@ int SDL_Android_AudioTrack_reserve_byte_buffer(JNIEnv *env, SDL_Android_AudioTra
     atrack->byte_buffer_capacity = capacity;
     return capacity;
 }
-
+/**
+ * MARK 使用Android java层方法进行播放
+ * @param env
+ * @param atrack
+ * @param data
+ * @param size_in_byte
+ * @return
+ */
 int SDL_Android_AudioTrack_write(JNIEnv *env, SDL_Android_AudioTrack *atrack, uint8_t *data, int size_in_byte)
 {
     if (size_in_byte <= 0)

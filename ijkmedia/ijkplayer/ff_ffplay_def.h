@@ -700,8 +700,9 @@ typedef struct FFPlayer {
     int mediacodec_mpeg4;
     int mediacodec_handle_resolution_change;
     int mediacodec_auto_rotate;
-
+	//MARK 是否使用opensl es 默认不启动
     int opensles;
+    //MARK 是否使用soundtouch 默认不启动
     int soundtouch_enable;
 
     char *iformat_name;

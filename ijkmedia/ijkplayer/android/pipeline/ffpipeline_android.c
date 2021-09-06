@@ -78,7 +78,12 @@ static IJKFF_Pipenode *func_open_video_decoder(IJKFF_Pipeline *pipeline, FFPlaye
 
     return node;
 }
-
+/**
+ * MARK 创建音频输出aout
+ * @param pipeline
+ * @param ffp
+ * @return
+ */
 static SDL_Aout *func_open_audio_output(IJKFF_Pipeline *pipeline, FFPlayer *ffp)
 {
     SDL_Aout *aout = NULL;
@@ -149,7 +154,9 @@ IJKFF_Pipeline *ffpipeline_create_from_android(FFPlayer *ffp)
     }
 
     pipeline->func_destroy              = func_destroy;
+    //MARK 打开视频解码
     pipeline->func_open_video_decoder   = func_open_video_decoder;
+    //MARK 打开音频解码
     pipeline->func_open_audio_output    = func_open_audio_output;
     pipeline->func_init_video_decoder   = func_init_video_decoder;
     pipeline->func_config_video_decoder = func_config_video_decoder;

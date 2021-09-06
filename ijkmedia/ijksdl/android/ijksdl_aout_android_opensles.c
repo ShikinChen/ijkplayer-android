@@ -186,6 +186,7 @@ static int aout_thread_n(SDL_Aout *aout)
 
         next_buffer = opaque->buffer + next_buffer_index * bytes_per_buffer;
         next_buffer_index = (next_buffer_index + 1) % OPENSLES_BUFFERS;
+        //MARK 调用opaque->spec.callback的回调进行解码 默认是调用ffplayer的sdl_audio_callback
         audio_cblk(userdata, next_buffer, bytes_per_buffer);
         if (opaque->need_flush) {
             (*slBufferQueueItf)->Clear(slBufferQueueItf);
@@ -197,6 +198,7 @@ static int aout_thread_n(SDL_Aout *aout)
             opaque->need_flush = 0;
             (*slBufferQueueItf)->Clear(slBufferQueueItf);
         } else {
+            //MARK 将音频数据放去队列使用opensl es播放
             slRet = (*slBufferQueueItf)->Enqueue(slBufferQueueItf, next_buffer, bytes_per_buffer);
             if (slRet == SL_RESULT_SUCCESS) {
                 // do nothing
@@ -419,6 +421,7 @@ static int aout_open_audio(SDL_Aout *aout, const SDL_AudioSpec *desired, SDL_Aud
 
     opaque->pause_on = 1;
     opaque->abort_request = 0;
+    //MARK 启动和创建音频解码线程
     opaque->audio_tid = SDL_CreateThreadEx(&opaque->_audio_tid, aout_thread, aout, "ff_aout_opensles");
     CHECK_COND_ERROR(opaque->audio_tid, "%s: failed to SDL_CreateThreadEx", __func__);
 
@@ -483,7 +486,10 @@ static double aout_get_latency_seconds(SDL_Aout *aout)
     double latency = ((double)opaque->milli_per_buffer) * state.count / 1000;
     return latency;
 }
-
+/**
+ * MARK 创建opensl es的aout 音频输出
+ * @return
+ */
 SDL_Aout *SDL_AoutAndroid_CreateForOpenSLES()
 {
     SDLTRACE("%s\n", __func__);

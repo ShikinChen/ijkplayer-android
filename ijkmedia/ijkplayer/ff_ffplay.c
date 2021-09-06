@@ -932,6 +932,7 @@ static void video_image_display2(FFPlayer *ffp)
                 SDL_Delay(20);
             }
         }
+        //MARK 将vout显示yuv帧图像在sdl显示
         SDL_VoutDisplayYUVOverlay(ffp->vout, vp->bmp);
         ffp->stat.vfps = SDL_SpeedSamplerAdd(&ffp->vfps_sampler, FFP_SHOW_VFPS_FFPLAY, "vfps[ffplay]");
         if (!ffp->first_video_frame_rendered) {
@@ -1327,6 +1328,11 @@ static void update_video_pts(VideoState *is, double pts, int64_t pos, int serial
 }
 
 /* called to display each frame */
+/**
+ * MARK 显示视频帧
+ * @param opaque
+ * @param remaining_time
+ */
 static void video_refresh(FFPlayer *opaque, double *remaining_time)
 {
     FFPlayer *ffp = opaque;
@@ -1373,7 +1379,7 @@ retry:
             /* compute nominal last_duration */
             last_duration = vp_duration(is, lastvp, vp);
             delay = compute_target_delay(ffp, last_duration, is);
-
+            //MARK 根据音视频同步类型进行时间差计算
             time= av_gettime_relative()/1000000.0;
             if (isnan(is->frame_timer) || time < is->frame_timer)
                 is->frame_timer = time;
@@ -1390,11 +1396,12 @@ retry:
             if (!isnan(vp->pts))
                 update_video_pts(is, vp->pts, vp->pos, vp->serial);
             SDL_UnlockMutex(is->pictq.mutex);
-
+            //MARK 进行音视频同步差修正
             if (frame_queue_nb_remaining(&is->pictq) > 1) {
                 Frame *nextvp = frame_queue_peek_next(&is->pictq);
                 duration = vp_duration(is, vp, nextvp);
                 if(!is->step && (ffp->framedrop > 0 || (ffp->framedrop && get_master_sync_type(is) != AV_SYNC_VIDEO_MASTER)) && time > is->frame_timer + duration) {
+                    //MARK 非视频帧为主同步进行重复调用retry
                     frame_queue_next(&is->pictq);
                     goto retry;
                 }
@@ -1436,6 +1443,7 @@ retry:
         }
 display:
         /* display picture */
+        //MARK 将视频帧显示出来
         if (!ffp->display_disable && is->force_refresh && is->show_mode == SHOW_MODE_VIDEO && is->pictq.rindex_shown)
             video_display2(ffp);
     }
@@ -2010,7 +2018,7 @@ end:
 }
 #endif  /* CONFIG_AVFILTER */
 /**
- * MARK 音频解码线程
+ * MARK 解码音频线程
  * @param arg
  * @return
  */
@@ -2406,7 +2414,11 @@ static int video_thread(void *arg)
     }
     return ret;
 }
-
+/**
+ * MARK 解码字幕线程
+ * @param arg
+ * @return
+ */
 static int subtitle_thread(void *arg)
 {
     FFPlayer *ffp = arg;
@@ -2510,6 +2522,7 @@ static int synchronize_audio(VideoState *is, int nb_samples)
 }
 
 /**
+ * MARK 音频帧解码
  * Decode one audio frame and return its uncompressed size.
  *
  * The processed audio frame is decoded, converted if required, and
@@ -2554,6 +2567,7 @@ reload:
             av_usleep (1000);
         }
 #endif
+        //MARK 从音频队列获取帧
         if (!(af = frame_queue_peek_readable(&is->sampq)))
             return -1;
         frame_queue_next(&is->sampq);
@@ -2689,6 +2703,12 @@ reload:
 }
 
 /* prepare a new audio buffer */
+/**
+ * MARK sdl音频回调
+ * @param opaque
+ * @param stream
+ * @param len
+ */
 static void sdl_audio_callback(void *opaque, Uint8 *stream, int len)
 {
     FFPlayer *ffp = opaque;
@@ -2718,6 +2738,7 @@ static void sdl_audio_callback(void *opaque, Uint8 *stream, int len)
 
     while (len > 0) {
         if (is->audio_buf_index >= is->audio_buf_size) {
+            //MARK 对音频帧进行解码
            audio_size = audio_decode_frame(ffp);
            if (audio_size < 0) {
                 /* if error, just output silence */
@@ -2817,6 +2838,7 @@ static int audio_open(FFPlayer *opaque, int64_t wanted_channel_layout, int wante
     wanted_spec.samples = FFMAX(SDL_AUDIO_MIN_BUFFER_SIZE, 2 << av_log2(wanted_spec.freq / SDL_AoutGetAudioPerSecondCallBacks(ffp->aout)));
     wanted_spec.callback = sdl_audio_callback;
     wanted_spec.userdata = opaque;
+    //MARK 使用aout打开音频并且引入wanted_spec到ffp->opaque->spec
     while (SDL_AoutOpenAudio(ffp->aout, &wanted_spec, &spec) < 0) {
         /* avoid infinity loop on exit. --by bbcallen */
         if (is->abort_request)

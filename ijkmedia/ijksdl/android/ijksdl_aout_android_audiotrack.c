@@ -68,7 +68,12 @@ typedef struct SDL_Aout_Opaque {
     volatile float speed;
     volatile bool speed_changed;
 } SDL_Aout_Opaque;
-
+/**
+ * MARK 音频解码线程
+ * @param env
+ * @param aout
+ * @return
+ */
 static int aout_thread_n(JNIEnv *env, SDL_Aout *aout)
 {
     SDL_Aout_Opaque *opaque = aout->opaque;
@@ -114,7 +119,7 @@ static int aout_thread_n(JNIEnv *env, SDL_Aout *aout)
             SDL_Android_AudioTrack_setSpeed(env, atrack, opaque->speed);
         }
         SDL_UnlockMutex(opaque->wakeup_mutex);
-
+        //MARK 调用opaque->spec.callback的回调进行解码 默认是调用ffplayer的sdl_audio_callback
         audio_cblk(userdata, buffer, copy_size);
         if (opaque->need_flush) {
             SDL_Android_AudioTrack_flush(env, atrack);
@@ -125,6 +130,7 @@ static int aout_thread_n(JNIEnv *env, SDL_Aout *aout)
             opaque->need_flush = 0;
             SDL_Android_AudioTrack_flush(env, atrack);
         } else {
+            //MARK 使用java层播放
             int written = SDL_Android_AudioTrack_write(env, atrack, buffer, copy_size);
             if (written != copy_size) {
                 ALOGW("AudioTrack: not all data copied %d/%d", (int)written, (int)copy_size);
@@ -151,7 +157,14 @@ static int aout_thread(void *arg)
 
     return aout_thread_n(env, aout);
 }
-
+/**
+ * MARK 启动音频线程
+ * @param env
+ * @param aout
+ * @param desired
+ * @param obtained
+ * @return
+ */
 static int aout_open_audio_n(JNIEnv *env, SDL_Aout *aout, const SDL_AudioSpec *desired, SDL_AudioSpec *obtained)
 {
     assert(desired);
@@ -190,6 +203,7 @@ static int aout_open_audio_n(JNIEnv *env, SDL_Aout *aout, const SDL_AudioSpec *d
 
     opaque->pause_on = 1;
     opaque->abort_request = 0;
+    //MARK 创建和启动音频解码线程
     opaque->audio_tid = SDL_CreateThreadEx(&opaque->_audio_tid, aout_thread, aout, "ff_aout_android");
     if (!opaque->audio_tid) {
         ALOGE("aout_open_audio_n: failed to create audio thread");
@@ -301,7 +315,10 @@ static void func_set_playback_rate(SDL_Aout *aout, float speed)
     SDL_CondSignal(opaque->wakeup_cond);
     SDL_UnlockMutex(opaque->wakeup_mutex);
 }
-
+/**
+ * MARK 创建java层Android的aout 音频输出
+ * @return
+ */
 SDL_Aout *SDL_AoutAndroid_CreateForAudioTrack()
 {
     SDL_Aout *aout = SDL_Aout_CreateInternal(sizeof(SDL_Aout_Opaque));

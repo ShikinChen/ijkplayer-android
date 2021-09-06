@@ -80,9 +80,11 @@
 #define BUFFERING_CHECK_PER_BYTES               (512)
 #define BUFFERING_CHECK_PER_MILLISECONDS        (500)
 #define FAST_BUFFERING_CHECK_PER_MILLISECONDS   (50)
+//MARK 将某一帧保存图片尝试次数
 #define MAX_RETRY_CONVERT_IMAGE                 (3)
 
 #define MAX_QUEUE_SIZE (15 * 1024 * 1024)
+//MARK 默认寻找帧超时时间
 #define MAX_ACCURATE_SEEK_TIMEOUT (5000)
 #ifdef FFP_MERGE
 #define MIN_FRAMES 25
@@ -219,6 +221,7 @@ typedef struct Frame {
 #ifdef FFP_MERGE
     SDL_Texture *bmp;
 #else
+    //MARK 缓存视频显示输出sdl图层
     SDL_VoutOverlay *bmp;
 #endif
     int allocated;
@@ -228,10 +231,15 @@ typedef struct Frame {
     AVRational sar;
     int uploaded;
 } Frame;
-
+/**
+ * MARK 帧队列
+ */
 typedef struct FrameQueue {
+	//MARK sdl帧队列
     Frame queue[FRAME_QUEUE_SIZE];
+    //MARK 读取下标
     int rindex;
+    //MARK 写入下标
     int windex;
     int size;
     int max_size;
@@ -241,7 +249,7 @@ typedef struct FrameQueue {
     SDL_cond *cond;
     PacketQueue *pktq;
 } FrameQueue;
-
+//MARK 音视频同步方案类型
 enum {
     AV_SYNC_AUDIO_MASTER, /* default choice */
     AV_SYNC_VIDEO_MASTER,
@@ -296,12 +304,17 @@ typedef struct VideoState {
     Clock vidclk;
     Clock extclk;
 
+    //MARK 视频队列
     FrameQueue pictq;
+    //MARK 字幕队列
     FrameQueue subpq;
+    //MARK 音频队列
     FrameQueue sampq;
-
+    //MARK 音频解码器
     Decoder auddec;
+    //MARK 视频解码器
     Decoder viddec;
+    //MARK 字幕解码器
     Decoder subdec;
 
     int audio_stream;
@@ -406,11 +419,14 @@ typedef struct VideoState {
     volatile int latest_video_seek_load_serial;
     volatile int latest_audio_seek_load_serial;
     volatile int64_t latest_seek_load_start_at;
-
+    //MARK 音频掉帧次数
     int drop_aframe_count;
+    //MARK 视频掉帧次数
     int drop_vframe_count;
     int64_t accurate_seek_start_time;
+    //MARK 视频寻找帧数
     volatile int64_t accurate_seek_vframe_pts;
+    //MARK 音频寻找帧数
     volatile int64_t accurate_seek_aframe_pts;
     int audio_accurate_seek_req;
     int video_accurate_seek_req;
@@ -641,6 +657,7 @@ typedef struct FFPlayer {
     SDL_Vout *vout;
     //MARK 管道
     struct IJKFF_Pipeline *pipeline;
+    //MARK 视频管道
     struct IJKFF_Pipenode *node_vdec;
     int sar_num;
     int sar_den;
@@ -648,6 +665,7 @@ typedef struct FFPlayer {
     char *video_codec_info;
     char *audio_codec_info;
     char *subtitle_codec_info;
+    //MARK sdl输出图片格式 间接决定vout 输出格式
     Uint32 overlay_format;
 
     int last_error;
@@ -714,8 +732,9 @@ typedef struct FFPlayer {
 
     AVApplicationContext *app_ctx;
     IjkIOManagerContext *ijkio_manager_ctx;
-
+    //MARK 是否启动精准寻找帧
     int enable_accurate_seek;
+    //MARK 实际寻找帧数超时时间
     int accurate_seek_timeout;
     int mediacodec_sync;
     int skip_calc_frame_rate;
@@ -754,6 +773,7 @@ inline static void ffp_reset_internal(FFPlayer *ffp)
     ffp->seek_by_bytes          = -1;
     ffp->display_disable        = 0;
     ffp->show_status            = 0;
+    //MARK 默认音视频同步以音频为主导
     ffp->av_sync_type           = AV_SYNC_AUDIO_MASTER;
     ffp->start_time             = AV_NOPTS_VALUE;
     ffp->duration               = AV_NOPTS_VALUE;
@@ -795,6 +815,7 @@ inline static void ffp_reset_internal(FFPlayer *ffp)
     av_freep(&ffp->video_codec_info);
     av_freep(&ffp->audio_codec_info);
     av_freep(&ffp->subtitle_codec_info);
+    //MARK ffplayer默认输出格式 SDL_FCC_RV32
     ffp->overlay_format         = SDL_FCC_RV32;
 
     ffp->last_error             = 0;

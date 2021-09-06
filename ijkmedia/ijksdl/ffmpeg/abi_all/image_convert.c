@@ -25,7 +25,18 @@
 #if defined(__ANDROID__)
 #include "libyuv.h"
 #endif
-
+/**
+ * MARK 进行图片格式转换
+ * @param width
+ * @param height
+ * @param dst_format
+ * @param dst_data
+ * @param dst_linesize
+ * @param src_format
+ * @param src_data
+ * @param src_linesize
+ * @return
+ */
 int ijk_image_convert(int width, int height,
     enum AVPixelFormat dst_format, uint8_t **dst_data, int *dst_linesize,
     enum AVPixelFormat src_format, const uint8_t **src_data, const int *src_linesize)

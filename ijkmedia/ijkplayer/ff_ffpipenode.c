@@ -72,7 +72,11 @@ void ffpipenode_free_p(IJKFF_Pipenode **node)
     ffpipenode_free(*node);
     *node = NULL;
 }
-
+/**
+ * MARK 视频管道同步
+ * @param node
+ * @return
+ */
 int ffpipenode_run_sync(IJKFF_Pipenode *node)
 {
     return node->func_run_sync(node);

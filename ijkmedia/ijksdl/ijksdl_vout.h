@@ -36,6 +36,7 @@ typedef struct SDL_VoutOverlay SDL_VoutOverlay;
 struct SDL_VoutOverlay {
     int w; /**< Read-only */
     int h; /**< Read-only */
+    //MARK 由ffplayer的overlay_format决定format
     Uint32 format; /**< Read-only */
     int planes; /**< Read-only */
     Uint16 *pitches; /**< in bytes, Read-only */
@@ -53,13 +54,13 @@ struct SDL_VoutOverlay {
     int     (*lock)(SDL_VoutOverlay *overlay);
     int     (*unlock)(SDL_VoutOverlay *overlay);
     void    (*unref)(SDL_VoutOverlay *overlay);
-
+	//MARK 填充帧数据方法
     int     (*func_fill_frame)(SDL_VoutOverlay *overlay, const AVFrame *frame);
 };
 
 typedef struct SDL_Vout_Opaque SDL_Vout_Opaque;
 /*
- * MARK SDL输出
+ * MARK SDL视频输出
  */
 typedef struct SDL_Vout SDL_Vout;
 struct SDL_Vout {
@@ -70,7 +71,7 @@ struct SDL_Vout {
     SDL_VoutOverlay *(*create_overlay)(int width, int height, int frame_format, SDL_Vout *vout);
     void (*free_l)(SDL_Vout *vout);
     int (*display_overlay)(SDL_Vout *vout, SDL_VoutOverlay *overlay);
-
+	//MARK sdl图像输出格式 由ffplayer的overlay_format决定
     Uint32 overlay_format;
 };
 

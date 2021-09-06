@@ -20,6 +20,8 @@ package tv.danmaku.ijk.media.example.fragments;
 import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
+import android.os.Environment;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -27,9 +29,12 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+
+import java.io.File;
 
 import tv.danmaku.ijk.media.example.R;
 import tv.danmaku.ijk.media.example.activities.VideoActivity;
@@ -65,10 +70,21 @@ public class SampleMediaListFragment extends Fragment {
                 SampleMediaItem item = mAdapter.getItem(position);
                 String name = item.mName;
                 String url = item.mUrl;
+                if(url.endsWith("testvideo.mp4")){
+                    File file=new File(url);
+                    Log.d("ijkplayer",url);
+                    if(!file.exists()){
+                        String tip=file.getAbsolutePath()+"不存在";
+                        Log.d("ijkplayer",tip);
+                        Toast.makeText(getContext(), tip, Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                }
                 VideoActivity.intentTo(activity, url, name);
             }
         });
-
+        String sdPath = Environment.getExternalStorageDirectory().getAbsolutePath();
+        mAdapter.addItem(sdPath + "/testvideo.mp4", "本地文件");
         String manifest_string =
                 "{\n" +
                 "    \"version\": \"1.0.0\",\n" +

@@ -109,7 +109,12 @@ void SDL_VoutUnrefYUVOverlay(SDL_VoutOverlay *overlay)
     if (overlay && overlay->unref)
         overlay->unref(overlay);
 }
-
+/**
+ * MARK 填充帧yuv数据到sdl图层
+ * @param overlay
+ * @param frame
+ * @return
+ */
 int SDL_VoutFillFrameYUVOverlay(SDL_VoutOverlay *overlay, const AVFrame *frame)
 {
     if (!overlay || !overlay->func_fill_frame)

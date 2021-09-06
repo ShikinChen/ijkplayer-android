@@ -30,6 +30,9 @@
 #include "ijksdl_mutex.h"
 
 typedef struct SDL_Aout_Opaque SDL_Aout_Opaque;
+/**
+ * MARK SDL音频输出
+ */
 typedef struct SDL_Aout SDL_Aout;
 struct SDL_Aout {
     SDL_mutex *mutex;

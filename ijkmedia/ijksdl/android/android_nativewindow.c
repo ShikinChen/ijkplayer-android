@@ -168,10 +168,10 @@ typedef struct AndroidHalFourccDescriptor {
     const char* name;
 
     int hal_format;
-
+    //MARK 渲染方法
     int (*render)(ANativeWindow_Buffer *native_buffer, const SDL_VoutOverlay *overlay);
 } AndroidHalFourccDescriptor;
-
+//MARK 渲染方式AndroidHalFourccDescriptor数组
 static AndroidHalFourccDescriptor g_hal_fcc_map[] = {
     // YV12
     { HAL_PIXEL_FORMAT_YV12, "HAL_YV12", HAL_PIXEL_FORMAT_YV12, android_render_on_yv12 },
@@ -198,7 +198,12 @@ AndroidHalFourccDescriptor *native_window_get_desc(int fourcc_or_hal)
 
     return NULL;
 }
-
+/**
+ * MARK 通过sdl在Android的NativeWindow显示图像
+ * @param native_window
+ * @param overlay
+ * @return
+ */
 int SDL_Android_NativeWindow_display_l(ANativeWindow *native_window, SDL_VoutOverlay *overlay)
 {
     int retval;
@@ -221,18 +226,20 @@ int SDL_Android_NativeWindow_display_l(ANativeWindow *native_window, SDL_VoutOve
     int curr_format = ANativeWindow_getFormat(native_window);
     int buff_w = IJKALIGN(overlay->w, 2);
     int buff_h = IJKALIGN(overlay->h, 2);
-
+    //MARK 根据 帧 的图像格式选择渲染方式
     AndroidHalFourccDescriptor *overlayDesc = native_window_get_desc(overlay->format);
     if (!overlayDesc) {
         ALOGE("SDL_Android_NativeWindow_display_l: unknown overlay format: %d", overlay->format);
         return -1;
     }
-
+    //MARK 根据 视频输出 的图像格式选择渲染方式
     AndroidHalFourccDescriptor *voutDesc = native_window_get_desc(curr_format);
+    //MARK 第一次不一致重置NativeWindow的buffer图像格式第二帧才正式用指定overlay->format输出格式渲染
     if (!voutDesc || voutDesc->hal_format != overlayDesc->hal_format) {
         ALOGD("ANativeWindow_setBuffersGeometry: w=%d, h=%d, f=%.4s(0x%x) => w=%d, h=%d, f=%.4s(0x%x)",
             curr_w, curr_h, (char*) &curr_format, curr_format,
             buff_w, buff_h, (char*) &overlay->format, overlay->format);
+        //MARK 如果输出和帧格式不一致 设置窗口buffer图像格式和大小
         retval = ANativeWindow_setBuffersGeometry(native_window, buff_w, buff_h, overlayDesc->hal_format);
         if (retval < 0) {
             ALOGE("SDL_Android_NativeWindow_display_l: ANativeWindow_setBuffersGeometry: failed %d", retval);
@@ -262,7 +269,7 @@ int SDL_Android_NativeWindow_display_l(ANativeWindow *native_window, SDL_VoutOve
         ANativeWindow_setBuffersGeometry(native_window, buff_w, buff_h, overlayDesc->hal_format);
         return -1;
     }
-
+    //MARK 本地例子会调用 android_render_on_rgb8888
     int render_ret = voutDesc->render(&out_buffer, overlay);
     if (render_ret < 0) {
         // TODO: 8 set all black

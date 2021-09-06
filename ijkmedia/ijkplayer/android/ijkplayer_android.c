@@ -36,7 +36,7 @@ IjkMediaPlayer *ijkmp_android_create(int(*msg_loop)(void*))
     IjkMediaPlayer *mp = ijkmp_create(msg_loop);
     if (!mp)
         goto fail;
-
+    //MARK 初始化ffplayer播放器的sdl输出 vout
     mp->ffplayer->vout = SDL_VoutAndroid_CreateForAndroidSurface();
     if (!mp->ffplayer->vout)
         goto fail;

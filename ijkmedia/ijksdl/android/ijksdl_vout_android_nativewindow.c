@@ -92,7 +92,14 @@ typedef struct SDL_Vout_Opaque {
 
     IJK_EGL         *egl;
 } SDL_Vout_Opaque;
-
+/**
+ * MARK 创建sdl显示图像层
+ * @param width
+ * @param height
+ * @param frame_format
+ * @param vout
+ * @return
+ */
 static SDL_VoutOverlay *func_create_overlay_l(int width, int height, int frame_format, SDL_Vout *vout)
 {
     switch (frame_format) {
@@ -138,7 +145,12 @@ static void func_free_l(SDL_Vout *vout)
 
     SDL_Vout_FreeInternal(vout);
 }
-
+/**
+ * MARK 利用sld显示图像
+ * @param vout
+ * @param overlay
+ * @return
+ */
 static int func_display_overlay_l(SDL_Vout *vout, SDL_VoutOverlay *overlay)
 {
     SDL_Vout_Opaque *opaque = vout->opaque;
@@ -190,7 +202,8 @@ static int func_display_overlay_l(SDL_Vout *vout, SDL_VoutOverlay *overlay)
 
     // fallback to ANativeWindow
     IJK_EGL_terminate(opaque->egl);
-    return SDL_Android_NativeWindow_display_l(native_window, overlay); 
+    //MARK 通过sdl在Android的NativeWindow显示图像
+    return SDL_Android_NativeWindow_display_l(native_window, overlay);
 }
 
 static int func_display_overlay(SDL_Vout *vout, SDL_VoutOverlay *overlay)
@@ -380,7 +393,7 @@ static int SDL_VoutAndroid_releaseBufferProxy_l(SDL_Vout *vout, SDL_AMediaCodecB
             proxy->buffer_id,
             proxy->acodec_serial,
             SDL_AMediaCodec_getSerial(opaque->acodec),
-            proxy->buffer_index, 
+            proxy->buffer_index,
             render ? "true" : "false",
             (proxy->buffer_info.flags & AMEDIACODEC__BUFFER_FLAG_FAKE_FRAME) ? "YES" : "NO");
         return 0;
@@ -394,14 +407,14 @@ static int SDL_VoutAndroid_releaseBufferProxy_l(SDL_Vout *vout, SDL_AMediaCodecB
         return 0;
     }
 
-    sdl_amedia_status_t amc_ret = SDL_AMediaCodec_releaseOutputBuffer(opaque->acodec, proxy->buffer_index, render);    
+    sdl_amedia_status_t amc_ret = SDL_AMediaCodec_releaseOutputBuffer(opaque->acodec, proxy->buffer_index, render);
     if (amc_ret != SDL_AMEDIA_OK) {
         ALOGW("%s: [%d] !!!!!!!! proxy %d: vout: %d idx: %d render: %s, fake: %s",
             __func__,
             proxy->buffer_id,
             proxy->acodec_serial,
             SDL_AMediaCodec_getSerial(opaque->acodec),
-            proxy->buffer_index, 
+            proxy->buffer_index,
             render ? "true" : "false",
             (proxy->buffer_info.flags & AMEDIACODEC__BUFFER_FLAG_FAKE_FRAME) ? "YES" : "NO");
         proxy->buffer_index = -1;

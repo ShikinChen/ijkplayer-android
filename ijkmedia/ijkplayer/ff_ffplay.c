@@ -374,7 +374,15 @@ static void decoder_init(Decoder *d, AVCodecContext *avctx, PacketQueue *queue, 
 
     SDL_ProfilerReset(&d->decode_profiler, -1);
 }
-
+/**
+ * MARK 将视频某一帧转为图片
+ * @param ffp
+ * @param src_frame
+ * @param src_frame_pts
+ * @param width
+ * @param height
+ * @return
+ */
 static int convert_image(FFPlayer *ffp, AVFrame *src_frame, int64_t src_frame_pts, int width, int height) {
     GetImgInfo *img_info = ffp->get_img_info;
     VideoState *is = ffp->is;
@@ -436,6 +444,7 @@ static int convert_image(FFPlayer *ffp, AVFrame *src_frame, int64_t src_frame_pt
     avpkt.data = NULL;
 
     if (!img_info->frame_img_convert_ctx) {
+        //MARK 初始化转换器上下文
         img_info->frame_img_convert_ctx = sws_getContext(width,
 		    height,
 		    src_frame->format,
@@ -455,6 +464,7 @@ static int convert_image(FFPlayer *ffp, AVFrame *src_frame, int64_t src_frame_pt
     }
 
     if (!img_info->frame_img_codec_ctx) {
+        //MARK 初始化视频编码器上下文
         AVCodec *image_codec = avcodec_find_encoder(AV_CODEC_ID_PNG);
         if (!image_codec) {
             ret = -1;
@@ -476,7 +486,7 @@ static int convert_image(FFPlayer *ffp, AVFrame *src_frame, int64_t src_frame_pt
         img_info->frame_img_codec_ctx->time_base.den = ffp->is->video_st->time_base.den;
         avcodec_open2(img_info->frame_img_codec_ctx, image_codec, NULL);
     }
-
+    //MARK 初始化输出视频帧
     dst_frame = av_frame_alloc();
     if (!dst_frame) {
         ret = -1;
@@ -508,7 +518,7 @@ static int convert_image(FFPlayer *ffp, AVFrame *src_frame, int64_t src_frame_pt
         av_log(NULL, AV_LOG_ERROR, "%s av_image_fill_arrays failed\n", __func__);
         goto fail2;
     }
-
+    //MARK 将src_frame->data转为dst_frame->data 一个rgb图片数据
     ret = sws_scale(img_info->frame_img_convert_ctx,
             (const uint8_t * const *) src_frame->data,
             src_frame->linesize,
@@ -522,7 +532,7 @@ static int convert_image(FFPlayer *ffp, AVFrame *src_frame, int64_t src_frame_pt
         av_log(NULL, AV_LOG_ERROR, "%s sws_scale failed\n", __func__);
         goto fail2;
     }
-
+    //MARK 将dst_frame->data封到AVPacket然后保存到本地一张图片
     ret = avcodec_encode_video2(img_info->frame_img_codec_ctx, &avpkt, dst_frame, &got_packet);
 
     if (ret >= 0 && got_packet > 0) {
@@ -562,7 +572,14 @@ fail0:
 
     return ret;
 }
-
+/**
+ * MARK 解码每一帧
+ * @param ffp
+ * @param d
+ * @param frame
+ * @param sub
+ * @return
+ */
 static int decoder_decode_frame(FFPlayer *ffp, Decoder *d, AVFrame *frame, AVSubtitle *sub) {
     int ret = AVERROR(EAGAIN);
 
@@ -722,7 +739,11 @@ static Frame *frame_queue_peek_last(FrameQueue *f)
 {
     return &f->queue[f->rindex];
 }
-
+/**
+ * MARK 获取Frame队列的帧
+ * @param f
+ * @return
+ */
 static Frame *frame_queue_peek_writable(FrameQueue *f)
 {
     /* wait until we have space to put a new frame */
@@ -754,7 +775,10 @@ static Frame *frame_queue_peek_readable(FrameQueue *f)
 
     return &f->queue[(f->rindex + f->rindex_shown) % f->max_size];
 }
-
+/**
+ * MARK 计算帧队列总数和写入下标
+ * @param f
+ */
 static void frame_queue_push(FrameQueue *f)
 {
     if (++f->windex == f->max_size)
@@ -1480,6 +1504,7 @@ static void alloc_picture(FFPlayer *ffp, int frame_format)
 #endif
 
     SDL_VoutSetOverlayFormat(ffp->vout, ffp->overlay_format);
+    //MARK 创建sdl显示的bmp 但是作为缓存是像素数据是空的
     vp->bmp = SDL_Vout_CreateOverlay(vp->width, vp->height,
                                    frame_format,
                                    ffp->vout);
@@ -1508,7 +1533,16 @@ static void alloc_picture(FFPlayer *ffp, int frame_format)
     SDL_CondSignal(is->pictq.cond);
     SDL_UnlockMutex(is->pictq.mutex);
 }
-
+/**
+ * MARK 将视频帧转换成图片放入队列
+ * @param ffp
+ * @param src_frame
+ * @param pts
+ * @param duration
+ * @param pos
+ * @param serial
+ * @return
+ */
 static int queue_picture(FFPlayer *ffp, AVFrame *src_frame, double pts, double duration, int64_t pos, int serial)
 {
     VideoState *is = ffp->is;
@@ -1520,7 +1554,7 @@ static int queue_picture(FFPlayer *ffp, AVFrame *src_frame, double pts, double d
 
     int64_t deviation2 = 0;
     int64_t deviation3 = 0;
-
+    //MARK enable_accurate_seek主要控制 启动精准寻找帧 默认关闭 没有开启接口
     if (ffp->enable_accurate_seek && is->video_accurate_seek_req && !is->seek_req) {
         if (!isnan(pts)) {
             video_seek_pos = is->seek_pos;
@@ -1610,7 +1644,7 @@ static int queue_picture(FFPlayer *ffp, AVFrame *src_frame, double pts, double d
     printf("frame_type=%c pts=%0.3f\n",
            av_get_picture_type_char(src_frame->pict_type), pts);
 #endif
-
+    //MARK 获取视频帧
     if (!(vp = frame_queue_peek_writable(&is->pictq)))
         return -1;
 
@@ -1635,6 +1669,7 @@ static int queue_picture(FFPlayer *ffp, AVFrame *src_frame, double pts, double d
 
         /* the allocation must be done in the main thread to avoid
            locking problems. */
+        //MARK 实例化缓存图片
         alloc_picture(ffp, src_frame->format);
 
         if (is->videoq.abort_request)
@@ -1656,6 +1691,7 @@ static int queue_picture(FFPlayer *ffp, AVFrame *src_frame, double pts, double d
 #endif
 #endif
         // FIXME: set swscale options
+        //MARK 将帧数据填充到vp->bmp
         if (SDL_VoutFillFrameYUVOverlay(vp->bmp, src_frame) < 0) {
             av_log(NULL, AV_LOG_FATAL, "Cannot initialize the conversion context\n");
             exit(1);
@@ -1684,7 +1720,12 @@ static int queue_picture(FFPlayer *ffp, AVFrame *src_frame, double pts, double d
     }
     return 0;
 }
-
+/**
+ * MARK 获取视频帧
+ * @param ffp
+ * @param frame
+ * @return
+ */
 static int get_video_frame(FFPlayer *ffp, AVFrame *frame)
 {
     VideoState *is = ffp->is;
@@ -1968,7 +2009,11 @@ end:
     return ret;
 }
 #endif  /* CONFIG_AVFILTER */
-
+/**
+ * MARK 音频解码线程
+ * @param arg
+ * @return
+ */
 static int audio_thread(void *arg)
 {
     FFPlayer *ffp = arg;
@@ -2003,6 +2048,7 @@ static int audio_thread(void *arg)
 
         if (got_frame) {
                 tb = (AVRational){1, frame->sample_rate};
+                //MARK enable_accurate_seek主要控制 启动精准寻找帧 默认关闭 没有开启接口
                 if (ffp->enable_accurate_seek && is->audio_accurate_seek_req && !is->seek_req) {
                     frame_pts = (frame->pts == AV_NOPTS_VALUE) ? NAN : frame->pts * av_q2d(tb);
                     now = av_gettime_relative() / 1000;
@@ -2022,6 +2068,7 @@ static int audio_thread(void *arg)
                                 av_log(NULL, AV_LOG_INFO, "audio accurate_seek start, is->seek_pos=%lld, audio_clock=%lf, is->accurate_seek_start_time = %lld\n", is->seek_pos, audio_clock, is->accurate_seek_start_time);
                             }
                             is->drop_aframe_count++;
+                            //MARK 音频同步处理
                             while (is->video_accurate_seek_req && !is->abort_request) {
                                 int64_t vpts = is->accurate_seek_vframe_pts;
                                 deviation2 = vpts  - audio_clock * 1000 * 1000;
@@ -2043,6 +2090,7 @@ static int audio_thread(void *arg)
                             } else {
                                 now = av_gettime_relative() / 1000;
                                 if ((now - is->accurate_seek_start_time) <= ffp->accurate_seek_timeout) {
+                                    //MARK 处理成功释放帧
                                     av_frame_unref(frame);
                                     continue;  // drop some old frame when do accurate seek
                                 } else {
@@ -2050,6 +2098,7 @@ static int audio_thread(void *arg)
                                 }
                             }
                         } else {
+                            //MARK 寻找帧成功
                             if (audio_seek_pos == is->seek_pos) {
                                 av_log(NULL, AV_LOG_INFO, "audio accurate_seek is ok, is->drop_aframe_count=%d, audio_clock = %lf\n", is->drop_aframe_count, audio_clock);
                                 is->drop_aframe_count       = 0;
@@ -2141,7 +2190,9 @@ static int audio_thread(void *arg)
                 af->serial = is->auddec.pkt_serial;
                 af->duration = av_q2d((AVRational){frame->nb_samples, frame->sample_rate});
 
+                //MARK 将avframe转移到frame
                 av_frame_move_ref(af->frame, frame);
+                //MARK 计算帧队列写入下标和总数
                 frame_queue_push(&is->sampq);
 
 #if CONFIG_AVFILTER
@@ -2171,7 +2222,11 @@ static int decoder_start(Decoder *d, int (*fn)(void *), void *arg, const char *n
     }
     return 0;
 }
-
+/**
+ * MARK 使用ffmpeg软解码视频帧数
+ * @param arg
+ * @return
+ */
 static int ffplay_video_thread(void *arg)
 {
     FFPlayer *ffp = arg;
@@ -2212,12 +2267,13 @@ static int ffplay_video_thread(void *arg)
     }
 
     for (;;) {
+        //MARK 获取视频帧
         ret = get_video_frame(ffp, frame);
         if (ret < 0)
             goto the_end;
         if (!ret)
             continue;
-
+        //MARK 将某一帧保存图片
         if (ffp->get_frame_mode) {
             if (!ffp->get_img_info || ffp->get_img_info->count <= 0) {
                 av_frame_unref(frame);
@@ -2236,6 +2292,7 @@ static int ffplay_video_thread(void *arg)
             pts = pts * 1000;
             if (pts >= dst_pts) {
                 while (retry_convert_image <= MAX_RETRY_CONVERT_IMAGE) {
+                    //MARK 将视频某一帧转为图片
                     ret = convert_image(ffp, frame, (int64_t)pts, frame->width, frame->height);
                     if (!ret) {
                         convert_frame_count++;
@@ -2334,7 +2391,11 @@ static int ffplay_video_thread(void *arg)
     av_frame_free(&frame);
     return 0;
 }
-
+/**
+ * MARK 解码视频线程
+ * @param arg
+ * @return
+ */
 static int video_thread(void *arg)
 {
     FFPlayer *ffp = (FFPlayer *)arg;
@@ -2804,6 +2865,12 @@ static int audio_open(FFPlayer *opaque, int64_t wanted_channel_layout, int wante
 }
 
 /* open a given stream. Return 0 if OK */
+/**
+ * MARK 打开音视频流 实例化对应流解码器
+ * @param ffp
+ * @param stream_index
+ * @return
+ */
 static int stream_component_open(FFPlayer *ffp, int stream_index)
 {
     VideoState *is = ffp->is;
@@ -2820,6 +2887,7 @@ static int stream_component_open(FFPlayer *ffp, int stream_index)
 
     if (stream_index < 0 || stream_index >= ic->nb_streams)
         return -1;
+    //MARK 实例化解码器上下文
     avctx = avcodec_alloc_context3(NULL);
     if (!avctx)
         return AVERROR(ENOMEM);
@@ -2828,7 +2896,7 @@ static int stream_component_open(FFPlayer *ffp, int stream_index)
     if (ret < 0)
         goto fail;
     av_codec_set_pkt_timebase(avctx, ic->streams[stream_index]->time_base);
-
+	//MARK 查找对应解码器
     codec = avcodec_find_decoder(avctx->codec_id);
 
     switch (avctx->codec_type) {
@@ -2837,6 +2905,7 @@ static int stream_component_open(FFPlayer *ffp, int stream_index)
         case AVMEDIA_TYPE_VIDEO   : is->last_video_stream    = stream_index; forced_codec_name = ffp->video_codec_name; break;
         default: break;
     }
+    //MARK 如果指定解码器 通过解码器名找 不然让ffmpeg自行判断
     if (forced_codec_name)
         codec = avcodec_find_decoder_by_name(forced_codec_name);
     if (!codec) {
@@ -2865,7 +2934,7 @@ static int stream_component_open(FFPlayer *ffp, int stream_index)
     if(codec->capabilities & AV_CODEC_CAP_DR1)
         avctx->flags |= CODEC_FLAG_EMU_EDGE;
 #endif
-
+    //MARK 设置解码器参数
     opts = filter_codec_opts(ffp->codec_opts, avctx->codec_id, ic, ic->streams[stream_index], codec);
     if (!av_dict_get(opts, "threads", NULL, 0))
         av_dict_set(&opts, "threads", "auto", 0);
@@ -2938,6 +3007,7 @@ static int stream_component_open(FFPlayer *ffp, int stream_index)
             is->auddec.start_pts = is->audio_st->start_time;
             is->auddec.start_pts_tb = is->audio_st->time_base;
         }
+        //MARK 创建线程开始音频解码
         if ((ret = decoder_start(&is->auddec, audio_thread, ffp, "ff_audio_dec")) < 0)
             goto out;
         SDL_AoutPauseAudio(ffp->aout, 0);
@@ -2966,6 +3036,7 @@ static int stream_component_open(FFPlayer *ffp, int stream_index)
             if (!ffp->node_vdec)
                 goto fail;
         }
+        //MARK 创建线程开始视频解码
         if ((ret = decoder_start(&is->viddec, video_thread, ffp, "ff_video_dec")) < 0)
             goto out;
 
@@ -3066,6 +3137,7 @@ static int read_thread(void *arg)
     VideoState *is = ffp->is;
     AVFormatContext *ic = NULL;
     int err, i, ret __unused;
+    //MARK 记录音视频流索引
     int st_index[AVMEDIA_TYPE_NB];
     AVPacket pkt1, *pkt = &pkt1;
     int64_t stream_start_time;
@@ -3232,7 +3304,7 @@ static int read_thread(void *arg)
                 st_index[type] = i;
 
         // choose first h264
-
+		//MARK 是否视频流 是否含有h264 并且记录第一次h264所在流的索引
         if (type == AVMEDIA_TYPE_VIDEO) {
             enum AVCodecID codec_id = st->codecpar->codec_id;
             video_stream_count++;
@@ -3247,7 +3319,9 @@ static int read_thread(void *arg)
         st_index[AVMEDIA_TYPE_VIDEO] = first_h264_stream;
         av_log(NULL, AV_LOG_WARNING, "multiple video stream found, prefer first h264 stream: %d\n", first_h264_stream);
     }
+    //MARK 获取音视频和字幕流索引
     if (!ffp->video_disable)
+    	//MARK 如果有多个视频流 优先处理h264视频流
         st_index[AVMEDIA_TYPE_VIDEO] =
             av_find_best_stream(ic, AVMEDIA_TYPE_VIDEO,
                                 st_index[AVMEDIA_TYPE_VIDEO], -1, NULL, 0);

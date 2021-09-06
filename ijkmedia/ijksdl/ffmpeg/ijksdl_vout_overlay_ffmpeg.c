@@ -134,7 +134,12 @@ static void func_free_l(SDL_VoutOverlay *overlay)
 
     SDL_VoutOverlay_FreeInternal(overlay);
 }
-
+/**
+ * MARK 对sdl图层填充帧图像数据
+ * @param overlay
+ * @param frame
+ * @param planes
+ */
 static void overlay_fill(SDL_VoutOverlay *overlay, AVFrame *frame, int planes)
 {
     overlay->planes = planes;
@@ -156,7 +161,12 @@ static int func_unlock(SDL_VoutOverlay *overlay)
     SDL_VoutOverlay_Opaque *opaque = overlay->opaque;
     return SDL_UnlockMutex(opaque->mutex);
 }
-
+/**
+ * MARK 填充帧数据
+ * @param overlay
+ * @param frame
+ * @return
+ */
 static int func_fill_frame(SDL_VoutOverlay *overlay, const AVFrame *frame)
 {
     assert(overlay);
@@ -192,7 +202,7 @@ static int func_fill_frame(SDL_VoutOverlay *overlay, const AVFrame *frame)
                 dst_format = AV_PIX_FMT_YUV444P10LE;
             }
             break;
-        case SDL_FCC_RV32:
+        case SDL_FCC_RV32://MARK 默认输出格式
             dst_format = AV_PIX_FMT_0BGR32;
             break;
         case SDL_FCC_RV24:
@@ -209,6 +219,7 @@ static int func_fill_frame(SDL_VoutOverlay *overlay, const AVFrame *frame)
 
 
     // setup frame
+    //MARK 初始化帧 将帧数据填充到sdl图层
     if (use_linked_frame) {
         // linked frame
         av_frame_ref(opaque->linked_frame, frame);
@@ -255,6 +266,7 @@ static int func_fill_frame(SDL_VoutOverlay *overlay, const AVFrame *frame)
     } else if (ijk_image_convert(frame->width, frame->height,
                                  dst_format, swscale_dst_pic.data, swscale_dst_pic.linesize,
                                  frame->format, (const uint8_t**) frame->data, frame->linesize)) {
+        //MARK 对帧图片数据根据输出格式进行转换
         opaque->img_convert_ctx = sws_getCachedContext(opaque->img_convert_ctx,
                                                        frame->width, frame->height, frame->format, frame->width, frame->height,
                                                        dst_format, opaque->sws_flags, NULL, NULL, NULL);
@@ -281,6 +293,14 @@ static SDL_Class g_vout_overlay_ffmpeg_class = {
 };
 
 #ifndef __clang_analyzer__
+/**
+ * MARK 创建FFmpeg软解码sdl图层
+ * @param width
+ * @param height
+ * @param frame_format
+ * @param display
+ * @return
+ */
 SDL_VoutOverlay *SDL_VoutFFmpeg_CreateOverlay(int width, int height, int frame_format, SDL_Vout *display)
 {
     Uint32 overlay_format = display->overlay_format;

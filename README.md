@@ -35,9 +35,15 @@ cd ijkplayer-android
 
 ./init-android.sh
 
+#编译ffmpeg最好使用ndk r10e
+export ANDROID_NDK=NDK r10e的路径
+
 cd android/contrib
 ./compile-ffmpeg.sh clean
-./compile-ffmpeg.sh arm64 
+./compile-ffmpeg.sh arm64
+
+cd ..
+./compile-ijk.sh arm64
 
 #执行完compile-ffmpeg.sh arm64 编译完ffmpeg的arm64动态库后 直接将 ./android/ijkplayer 导入整个项目
 

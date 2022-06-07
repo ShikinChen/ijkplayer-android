@@ -6,9 +6,11 @@ add_definitions(-DNDEBUG)
 
 set(IJKMEDIA_PATH ${CMAKE_SOURCE_DIR}/ijkmedia)
 
-set(ABI "arm64")
+set(ABI ${ANDROID_ABI})
 if (${ANDROID_ABI} STREQUAL armeabi-v7a)
     set(ABI "armv7a")
+elseif (${ANDROID_ABI} STREQUAL arm64-v8a)
+    set(ABI "arm64")            
 endif ()
 
 set(FFMPEG_ABI_PATH ${CMAKE_SOURCE_DIR}/android/contrib/build/ffmpeg-${ABI}/output)

@@ -35,11 +35,14 @@ cd ijkplayer-android
 
 ./init-android.sh
 
-#编译ffmpeg最好使用ndk r10e
-export ANDROID_NDK=NDK r10e的路径
+#编译ffmpeg一定要使用ndk r17
+export ANDROID_NDK=NDK r17的路径
 
 cd android/contrib
 ./compile-ffmpeg.sh clean
+./compile-ffmpeg.sh arm64
+
+//会报 tools/do-compile-ffmpeg.sh: line 317: 40808 Segmentation fault: 11  make $FF_MAKE_FLAGS > /dev/null 错误再执行一次
 ./compile-ffmpeg.sh arm64
 
 cd ..

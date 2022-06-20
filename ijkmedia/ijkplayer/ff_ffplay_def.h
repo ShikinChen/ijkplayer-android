@@ -164,7 +164,9 @@ typedef struct MyAVPacketList {
     struct MyAVPacketList *next;
     int serial;
 } MyAVPacketList;
-
+/**
+ * MARK 编码包队列
+ */
 typedef struct PacketQueue {
     MyAVPacketList *first_pkt, *last_pkt;
     int nb_packets;
@@ -256,7 +258,11 @@ enum {
     AV_SYNC_EXTERNAL_CLOCK, /* synchronize to an external clock */
 };
 
+/**
+ * MARK 解码封装结构体
+ */
 typedef struct Decoder {
+    //MARK 编码包
     AVPacket pkt;
     AVPacket pkt_temp;
     PacketQueue *queue;

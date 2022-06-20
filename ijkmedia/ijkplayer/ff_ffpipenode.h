@@ -28,6 +28,9 @@
 
 typedef struct IJKFF_Pipenode_Opaque IJKFF_Pipenode_Opaque;
 typedef struct IJKFF_Pipenode IJKFF_Pipenode;
+/**
+ * MAKR 解码管道节点
+ */
 struct IJKFF_Pipenode {
     SDL_mutex *mutex;
     void *opaque;

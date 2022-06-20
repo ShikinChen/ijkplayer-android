@@ -355,7 +355,14 @@ static int64_t ijkio_cache_ffurl_size(IjkURLContext *h) {
     }
     return size;
 }
-
+/**
+ * MARK 打开缓存
+ * @param h
+ * @param url
+ * @param flags
+ * @param options
+ * @return
+ */
 static int ijkio_cache_io_open(IjkURLContext *h, const char *url, int flags, IjkAVDictionary **options) {
     int ret = 0;
     IjkIOCacheContext *c= h->priv_data;
@@ -478,7 +485,11 @@ static int64_t ijkio_cache_write_file(IjkURLContext *h) {
 
     return r;
 }
-
+/**
+ * MARK 缓存任务
+ * @param h
+ * @param r
+ */
 static void ijkio_cache_task(void *h, void *r) {
     IjkIOCacheContext *c= ((IjkURLContext *)h)->priv_data;
     c->task_is_running = 1;
@@ -532,7 +543,14 @@ static void ijkio_cache_task(void *h, void *r) {
     pthread_cond_signal(&c->cond_wakeup_exit);
     pthread_mutex_unlock(&c->file_mutex);
 }
-
+/**
+ * MARK 打开缓存
+ * @param h
+ * @param url
+ * @param flags
+ * @param options
+ * @return
+ */
 static int ijkio_cache_open(IjkURLContext *h, const char *url, int flags, IjkAVDictionary **options) {
     IjkIOCacheContext *c= h->priv_data;
     int ret = 0;
@@ -952,7 +970,13 @@ static int ijkio_cache_sync_read(IjkURLContext *h, unsigned char *buf, int size)
 
     return (int)ret;
 }
-
+/**
+ * MARK 读取缓存
+ * @param h
+ * @param buf
+ * @param size
+ * @return
+ */
 static int ijkio_cache_read(IjkURLContext *h, unsigned char *buf, int size) {
     IjkIOCacheContext *c = h->priv_data;
     int64_t          ret = 0;
@@ -1135,7 +1159,11 @@ static int ijkio_cache_pause(IjkURLContext *h) {
 
     return ret;
 }
-
+/**
+ * MARK 缓存恢复
+ * @param h
+ * @return
+ */
 static int ijkio_cache_resume(IjkURLContext *h) {
     IjkIOCacheContext *c = h->priv_data;
     int             ret  = 0;

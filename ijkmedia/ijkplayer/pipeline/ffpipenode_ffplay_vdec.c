@@ -33,7 +33,11 @@ static void func_destroy(IJKFF_Pipenode *node)
 {
     // do nothing
 }
-
+/**
+ * MARK 同步视频解码
+ * @param node
+ * @return
+ */
 static int func_run_sync(IJKFF_Pipenode *node)
 {
     IJKFF_Pipenode_Opaque *opaque = node->opaque;

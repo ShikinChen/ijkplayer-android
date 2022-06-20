@@ -775,10 +775,11 @@ IjkMediaPlayer_native_setup(JNIEnv *env, jobject thiz, jobject weak_this)
     JNI_CHECK_GOTO(mp, env, "java/lang/OutOfMemoryError", "mpjni: native_setup: ijkmp_create() failed", LABEL_RETURN);
 
     jni_set_media_player(env, thiz, mp);
-    //MARK 设置native层MediaPlayer的java层MediaPlayer播放器实例
+    //MARK 设置native层MediaPlayer的java层MediaPlayer播放器实例 这个是弱引用
     ijkmp_set_weak_thiz(mp, (*env)->NewGlobalRef(env, weak_this));
 	//MARK 设置native层ff播放器的java层MediaPlayer播放器实例
     ijkmp_set_inject_opaque(mp, ijkmp_get_weak_thiz(mp));
+    //MARK 相关io处理包含缓存
     ijkmp_set_ijkio_inject_opaque(mp, ijkmp_get_weak_thiz(mp));
     ijkmp_android_set_mediacodec_select_callback(mp, mediacodec_select_callback, ijkmp_get_weak_thiz(mp));
 

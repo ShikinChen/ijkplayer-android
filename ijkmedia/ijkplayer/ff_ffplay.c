@@ -187,7 +187,12 @@ static int packet_queue_put_private(PacketQueue *q, AVPacket *pkt)
     SDL_CondSignal(q->cond);
     return 0;
 }
-
+/**
+ * MARK 编码包放进队列
+ * @param q
+ * @param pkt
+ * @return
+ */
 static int packet_queue_put(PacketQueue *q, AVPacket *pkt)
 {
     int ret;
@@ -1739,7 +1744,7 @@ static int get_video_frame(FFPlayer *ffp, AVFrame *frame)
 {
     VideoState *is = ffp->is;
     int got_picture;
-
+    //MARK 进行缓存状态计算
     ffp_video_statistic_l(ffp);
     if ((got_picture = decoder_decode_frame(ffp, &is->viddec, frame, NULL)) < 0)
         return -1;
@@ -3434,7 +3439,9 @@ static int read_thread(void *arg)
     }
     ffp->prepared = true;
     ffp_notify_msg1(ffp, FFP_MSG_PREPARED);
+    //MARK 如果不是等待渲染和没有准备好就一只休眠
     if (!ffp->render_wait_start && !ffp->start_on_prepared) {
+        //MARK 如果暂停或者不是终止,进行20毫米休眠
         while (is->pause_req && !is->abort_request) {
             SDL_Delay(20);
         }
@@ -3470,7 +3477,7 @@ static int read_thread(void *arg)
             continue;
         }
 #endif
-        if (is->seek_req) {
+        if (is->seek_req) {//MARK 如果seek跳帧请求
             int64_t seek_target = is->seek_pos;
             int64_t seek_min    = is->seek_rel > 0 ? seek_target - is->seek_rel + 2: INT64_MIN;
             int64_t seek_max    = is->seek_rel < 0 ? seek_target - is->seek_rel - 2: INT64_MAX;
@@ -3479,11 +3486,15 @@ static int read_thread(void *arg)
 
             ffp_toggle_buffering(ffp, 1);
             ffp_notify_msg3(ffp, FFP_MSG_BUFFERING_UPDATE, 0, 0);
+            //MARK 进行seek跳帧
             ret = avformat_seek_file(is->ic, -1, seek_min, seek_target, seek_max, is->seek_flags);
             if (ret < 0) {
                 av_log(NULL, AV_LOG_ERROR,
                        "%s: error while seeking\n", is->ic->filename);
             } else {
+                /**
+                 * MARK 将各种媒体流放进编码包队列
+                 */
                 if (is->audio_stream >= 0) {
                     packet_queue_flush(&is->audioq);
                     packet_queue_put(&is->audioq, &flush_pkt);
@@ -3617,6 +3628,7 @@ static int read_thread(void *arg)
             }
         }
         pkt->flags = 0;
+        //MARK 读取编码包
         ret = av_read_frame(ic, pkt);
         if (ret < 0) {
             int pb_eof = 0;
@@ -3691,6 +3703,7 @@ static int read_thread(void *arg)
                 av_q2d(ic->streams[pkt->stream_index]->time_base) -
                 (double)(ffp->start_time != AV_NOPTS_VALUE ? ffp->start_time : 0) / 1000000
                 <= ((double)ffp->duration / 1000000);
+        //MARK 将各种媒体流放进编码包队列
         if (pkt->stream_index == is->audio_stream && pkt_in_play_range) {
             packet_queue_put(&is->audioq, pkt);
         } else if (pkt->stream_index == is->video_stream && pkt_in_play_range
@@ -4737,7 +4750,13 @@ void ffp_toggle_buffering(FFPlayer *ffp, int start_buffering)
     ffp_toggle_buffering_l(ffp, start_buffering);
     SDL_UnlockMutex(ffp->is->play_mutex);
 }
-
+/**
+ * MARK 缓存计算和赋值
+ * @param ffp
+ * @param st
+ * @param q
+ * @param cache
+ */
 void ffp_track_statistic_l(FFPlayer *ffp, AVStream *st, PacketQueue *q, FFTrackCacheStatistic *cache)
 {
     assert(cache);

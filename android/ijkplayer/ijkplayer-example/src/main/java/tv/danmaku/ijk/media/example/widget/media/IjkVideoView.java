@@ -810,7 +810,7 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
     @Override
     public void start() {
         if (isInPlaybackState()) {
-            mMediaPlayer.start();
+//            mMediaPlayer.start();
             mCurrentState = STATE_PLAYING;
         }
         mTargetState = STATE_PLAYING;

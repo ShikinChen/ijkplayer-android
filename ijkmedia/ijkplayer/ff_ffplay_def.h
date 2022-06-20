@@ -515,7 +515,7 @@ typedef struct FFStatistic
     float avdelay;
     float avdiff;
     int64_t bit_rate;
-
+    //MARK 音视频流缓存
     FFTrackCacheStatistic video_cache;
     FFTrackCacheStatistic audio_cache;
 

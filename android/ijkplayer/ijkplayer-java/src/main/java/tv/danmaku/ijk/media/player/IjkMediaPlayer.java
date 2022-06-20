@@ -1057,6 +1057,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     /*
+     * MARK native层回调postEvent方法
      * Called from native code when an interesting event happens. This method
      * just uses the EventHandler system to post the event back to the main app
      * thread. We use a weak reference to the original IjkMediaPlayer object so

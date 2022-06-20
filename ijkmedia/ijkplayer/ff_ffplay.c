@@ -1385,6 +1385,7 @@ retry:
                 is->frame_timer = time;
             if (time < is->frame_timer + delay) {
                 *remaining_time = FFMIN(is->frame_timer + delay - time, *remaining_time);
+                //MARK 每帧进行显示
                 goto display;
             }
 
@@ -4377,6 +4378,12 @@ static void ffp_show_version_int(FFPlayer *ffp, const char *module, unsigned ver
            (unsigned int)IJKVERSION_GET_MICRO(version));
 }
 
+/**
+ * MARK 异步方式做播放前准备工作
+ * @param ffp
+ * @param file_name
+ * @return
+ */
 int ffp_prepare_async_l(FFPlayer *ffp, const char *file_name)
 {
     assert(ffp);
@@ -4762,7 +4769,9 @@ void ffp_statistic_l(FFPlayer *ffp)
     ffp_audio_statistic_l(ffp);
     ffp_video_statistic_l(ffp);
 }
-
+/*
+ * MARK 检测解码缓存,主要通过循环不断调用这个方法
+ */
 void ffp_check_buffering_l(FFPlayer *ffp)
 {
     VideoState *is            = ffp->is;
@@ -4859,6 +4868,7 @@ void ffp_check_buffering_l(FFPlayer *ffp)
 #ifdef FFP_SHOW_BUF_POS
         av_log(ffp, AV_LOG_DEBUG, "buf pos=%"PRId64", %%%d\n", buf_time_position, buf_percent);
 #endif
+        //MARK 发送解码缓存信息
         ffp_notify_msg3(ffp, FFP_MSG_BUFFERING_UPDATE, (int)buf_time_position, buf_percent);
     }
 

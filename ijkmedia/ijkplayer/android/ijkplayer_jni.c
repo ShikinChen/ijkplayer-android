@@ -902,7 +902,14 @@ static bool mediacodec_select_callback(void *opaque, ijkmp_mediacodecinfo_contex
 fail:
     return found_codec_name;
 }
-
+/**
+ * MARK 从native层发送事件event到java层
+ * @param env
+ * @param weak_this
+ * @param what
+ * @param arg1
+ * @param arg2
+ */
 inline static void post_event(JNIEnv *env, jobject weak_this, int what, int arg1, int arg2)
 {
     // MPTRACE("post_event(%p, %p, %d, %d, %d)", (void*)env, (void*) weak_this, what, arg1, arg2);
@@ -917,6 +924,9 @@ inline static void post_event2(JNIEnv *env, jobject weak_this, int what, int arg
     // MPTRACE("post_event2()=void");
 }
 
+/*
+ * MARK native层消息队列循环
+ */
 static void message_loop_n(JNIEnv *env, IjkMediaPlayer *mp)
 {
     jobject weak_thiz = (jobject) ijkmp_get_weak_thiz(mp);

@@ -20,6 +20,9 @@
  */
 
 #include "IjkMediaPlayer.h"
+/*
+ * MARK 调用java层集合工具
+ */
 
 typedef struct J4AC_tv_danmaku_ijk_media_player_IjkMediaPlayer {
     jclass id;

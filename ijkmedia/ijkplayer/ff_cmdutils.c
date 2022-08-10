@@ -221,7 +221,11 @@ void *grow_array(void *array, int elem_size, int *size, int new_size)
     }
     return array;
 }
-
+/**
+ * MARK 根据视频流旋转方向
+ * @param st
+ * @return
+ */
 double get_rotation(AVStream *st)
 {
     AVDictionaryEntry *rotate_tag = av_dict_get(st->metadata, "rotate", NULL, 0);

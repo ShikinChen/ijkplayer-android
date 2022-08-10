@@ -152,7 +152,7 @@ public class VideoActivity extends AppCompatActivity implements TracksFragment.I
             finish();
             return;
         }
-        mVideoView.start();
+//        mVideoView.start();
     }
 
     @Override

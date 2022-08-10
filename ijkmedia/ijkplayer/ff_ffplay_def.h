@@ -752,6 +752,10 @@ typedef struct FFPlayer {
     char *mediacodec_default_name;
     int ijkmeta_delay_init;
     int render_wait_start;
+    //MARK 准备开始将编码包加入编码包队列,在不播放情况下进行缓存
+    int prepare_packet_queue_put;
+    //MARK 在不播放情况是否显示第一帧图片
+    int show_first_frame;
 } FFPlayer;
 
 #define fftime_to_milliseconds(ts) (av_rescale(ts, 1000, AV_TIME_BASE))
@@ -866,6 +870,9 @@ inline static void ffp_reset_internal(FFPlayer *ffp)
     ffp->mediacodec_default_name        = NULL; // option
     ffp->ijkmeta_delay_init             = 0; // option
     ffp->render_wait_start              = 0;
+
+    ffp->prepare_packet_queue_put       = 1;
+    ffp->show_first_frame               = 1;
 
     ijkmeta_reset(ffp->meta);
 

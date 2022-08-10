@@ -938,7 +938,10 @@ static void video_image_display2(FFPlayer *ffp)
             }
         }
         //MARK 将vout显示yuv帧图像在sdl显示
-        SDL_VoutDisplayYUVOverlay(ffp->vout, vp->bmp);
+        int ret= SDL_VoutDisplayYUVOverlay(ffp->vout, vp->bmp);
+        if(ret>=0&&ffp->show_first_frame){
+            ffp->show_first_frame=0;
+        }
         ffp->stat.vfps = SDL_SpeedSamplerAdd(&ffp->vfps_sampler, FFP_SHOW_VFPS_FFPLAY, "vfps[ffplay]");
         if (!ffp->first_video_frame_rendered) {
             ffp->first_video_frame_rendered = 1;
@@ -3440,7 +3443,7 @@ static int read_thread(void *arg)
     ffp->prepared = true;
     ffp_notify_msg1(ffp, FFP_MSG_PREPARED);
     //MARK 如果不是等待渲染和没有准备好就一只休眠
-    if (!ffp->render_wait_start && !ffp->start_on_prepared) {
+    if (!ffp->render_wait_start && !ffp->start_on_prepared&&!ffp->prepare_packet_queue_put) {
         //MARK 如果暂停或者不是终止,进行20毫米休眠
         while (is->pause_req && !is->abort_request) {
             SDL_Delay(20);
@@ -3882,6 +3885,11 @@ fail:
 // FFP_MERGE: options
 // FFP_MERGE: show_usage
 // FFP_MERGE: show_help_default
+/**
+ * MARK 强制刷新显示
+ * @param arg
+ * @return
+ */
 static int video_refresh_thread(void *arg)
 {
     FFPlayer *ffp = arg;
@@ -4889,6 +4897,9 @@ void ffp_check_buffering_l(FFPlayer *ffp)
 #endif
         //MARK 发送解码缓存信息
         ffp_notify_msg3(ffp, FFP_MSG_BUFFERING_UPDATE, (int)buf_time_position, buf_percent);
+        if(ffp->show_first_frame&&buf_percent>0){
+            ffp_seek_to_l(ffp,0);
+        }
     }
 
     if (need_start_buffering) {

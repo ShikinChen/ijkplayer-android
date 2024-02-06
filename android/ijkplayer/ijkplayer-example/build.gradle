@@ -30,12 +30,12 @@ android {
     flavorDimensions "version"
     productFlavors {
         all64 {
-            minSdkVersion 25
             dimension "version"
         }
         // armv5 {}
         // armv7a {}
-        // arm64 { minSdkVersion 21 }
+        arm64 {
+        }
         // x86 {}
     }
     ndkVersion '22.1.7171670'

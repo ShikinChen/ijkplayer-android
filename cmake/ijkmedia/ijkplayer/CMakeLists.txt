@@ -3,6 +3,11 @@ project("ijkplayer")
 
 set(IJKPLAYER_PATH ${IJKMEDIA_PATH}/ijkplayer)
 
+execute_process(
+        COMMAND bash ${IJKPLAYER_PATH}/version.sh ${IJKPLAYER_PATH} ijkversion.h
+        RESULT_VARIABLE result
+)
+
 file(GLOB CPP_FILE_PATH
         #ijkplayer
         ${IJKPLAYER_PATH}/*.c
@@ -32,4 +37,4 @@ find_library(jnigraphics-lib jnigraphics)
 
 target_link_libraries(
         ijkplayer
-        ijkffmpeg ijkj4a ijksdl ijksoundtouch  ${m-lib} ${z-lib} ${jnigraphics-lib})
+        ijkffmpeg ijkj4a ijksdl ijksoundtouch ${m-lib} ${z-lib} ${jnigraphics-lib})

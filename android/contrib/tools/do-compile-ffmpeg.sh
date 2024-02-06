@@ -25,7 +25,6 @@ echo "[*] check env $1"
 echo "===================="
 set -e
 
-
 #--------------------
 # common defines
 FF_ARCH=$1
@@ -38,10 +37,9 @@ if [ -z "$FF_ARCH" ]; then
     exit 1
 fi
 
-
-FF_BUILD_ROOT=`pwd`
-FF_ANDROID_PLATFORM=android-21
-
+CURRENT_DIR=$(dirname "$(readlink -f "$0")")
+FF_BUILD_ROOT=$(dirname "$CURRENT_DIR")
+FF_ANDROID_PLATFORM=21
 
 FF_BUILD_NAME=
 FF_SOURCE=
@@ -61,18 +59,23 @@ FF_DEP_LIBS=
 FF_MODULE_DIRS="compat libavcodec libavfilter libavformat libavutil libswresample libswscale"
 FF_ASSEMBLER_SUB_DIRS=
 
-
 #--------------------
 echo ""
 echo "--------------------"
 echo "[*] make NDK standalone toolchain"
 echo "--------------------"
-. ./tools/do-detect-env.sh
+source $CURRENT_DIR/do-detect-env.sh
 FF_MAKE_TOOLCHAIN_FLAGS=$IJK_MAKE_TOOLCHAIN_FLAGS
 FF_MAKE_FLAGS=$IJK_MAKE_FLAG
 FF_GCC_VER=$IJK_GCC_VER
 FF_GCC_64_VER=$IJK_GCC_64_VER
+FF_CC=$IJK_CC
+FF_IS_NOT_SUPPORT_ARM=$IJK_IS_NOT_SUPPORT_ARM
 
+if $FF_IS_NOT_SUPPORT_ARM; then
+    echo "ndk ${IJK_NDK_REL} not support arm"
+    exit 1
+fi
 
 #----- armv7a begin -----
 if [ "$FF_ARCH" = "armv7a" ]; then
@@ -88,24 +91,8 @@ if [ "$FF_ARCH" = "armv7a" ]; then
     FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-neon"
     FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-thumb"
 
-    FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -march=armv7-a -mcpu=cortex-a8 -mfpu=vfpv3-d16 -mfloat-abi=softfp -mthumb"
+    FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -march=armv7-a -mcpu=cortex-a8 -mfpu=vfpv3-d16 -mfloat-abi=softfp -mthumb -fno-integrated-as"
     FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS -Wl,--fix-cortex-a8"
-
-    FF_ASSEMBLER_SUB_DIRS="arm"
-
-elif [ "$FF_ARCH" = "armv5" ]; then
-    FF_BUILD_NAME=ffmpeg-armv5
-    FF_BUILD_NAME_OPENSSL=openssl-armv5
-    FF_BUILD_NAME_LIBSOXR=libsoxr-armv5
-    FF_SOURCE=$FF_BUILD_ROOT/$FF_BUILD_NAME
-
-    FF_CROSS_PREFIX=arm-linux-androideabi
-    FF_TOOLCHAIN_NAME=${FF_CROSS_PREFIX}-${FF_GCC_VER}
-
-    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=arm"
-
-    FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -march=armv5te -mtune=arm9tdmi -msoft-float"
-    FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS"
 
     FF_ASSEMBLER_SUB_DIRS="arm"
 
@@ -118,7 +105,7 @@ elif [ "$FF_ARCH" = "x86" ]; then
     FF_CROSS_PREFIX=i686-linux-android
     FF_TOOLCHAIN_NAME=x86-${FF_GCC_VER}
 
-    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=x86 --cpu=i686 --enable-x86asm"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=x86 --cpu=i686"
 
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS -march=atom -msse3 -ffast-math -mfpmath=sse"
     FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS"
@@ -134,12 +121,12 @@ elif [ "$FF_ARCH" = "x86_64" ]; then
     FF_CROSS_PREFIX=x86_64-linux-android
     FF_TOOLCHAIN_NAME=${FF_CROSS_PREFIX}-${FF_GCC_64_VER}
 
-    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=x86_64 --enable-x86asm"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=x86_64 --disable-neon"
 
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS"
     FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS"
 
-    FF_ASSEMBLER_SUB_DIRS="x86"
+    FF_ASSEMBLER_SUB_DIRS="x86_64"
 
 elif [ "$FF_ARCH" = "arm64" ]; then
     FF_BUILD_NAME=ffmpeg-arm64
@@ -150,17 +137,18 @@ elif [ "$FF_ARCH" = "arm64" ]; then
     FF_CROSS_PREFIX=aarch64-linux-android
     FF_TOOLCHAIN_NAME=${FF_CROSS_PREFIX}-${FF_GCC_64_VER}
 
-    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=aarch64 --enable-x86asm"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=aarch64 --disable-neon"
 
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS"
     FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS"
 
-    FF_ASSEMBLER_SUB_DIRS="aarch64 neon"
-
+    FF_ASSEMBLER_SUB_DIRS="aarch64"
 else
-    echo "unknown architecture $FF_ARCH";
+    echo "unknown architecture $FF_ARCH"
     exit 1
 fi
+
+FF_SOURCE=$FF_BUILD_ROOT/../../extra/ffmpeg
 
 if [ ! -d $FF_SOURCE ]; then
     echo ""
@@ -182,38 +170,61 @@ FF_DEP_LIBSOXR_INC=$FF_BUILD_ROOT/build/$FF_BUILD_NAME_LIBSOXR/output/include
 FF_DEP_LIBSOXR_LIB=$FF_BUILD_ROOT/build/$FF_BUILD_NAME_LIBSOXR/output/lib
 
 case "$UNAME_S" in
-    CYGWIN_NT-*)
-        FF_SYSROOT="$(cygpath -am $FF_SYSROOT)"
-        FF_PREFIX="$(cygpath -am $FF_PREFIX)"
+CYGWIN_NT-*)
+    FF_SYSROOT="$(cygpath -am $FF_SYSROOT)"
+    FF_PREFIX="$(cygpath -am $FF_PREFIX)"
     ;;
 esac
-
 
 mkdir -p $FF_PREFIX
 # mkdir -p $FF_SYSROOT
 
-
-FF_TOOLCHAIN_TOUCH="$FF_TOOLCHAIN_PATH/touch"
-if [ ! -f "$FF_TOOLCHAIN_TOUCH" ]; then
-    $ANDROID_NDK/build/tools/make-standalone-toolchain.sh \
-        $FF_MAKE_TOOLCHAIN_FLAGS \
-        --platform=$FF_ANDROID_PLATFORM \
-        --toolchain=$FF_TOOLCHAIN_NAME
-    touch $FF_TOOLCHAIN_TOUCH;
+if [ -d "$FF_TOOLCHAIN_PATH" ]; then
+    rm -rf $FF_TOOLCHAIN_PATH
 fi
-
+if [ "$FF_CC" = "gcc" ]; then
+    if [ ! -f "$FF_TOOLCHAIN_TOUCH" ]; then
+        $ANDROID_NDK/build/tools/make-standalone-toolchain.sh \
+            $FF_MAKE_TOOLCHAIN_FLAGS \
+            --platform=android-$FF_ANDROID_PLATFORM \
+            --toolchain=$FF_TOOLCHAIN_NAME
+    fi
+else
+    ARCH=$FF_ARCH
+    if [ "$FF_ARCH" = "armv7a" ]; then
+        ARCH=arm
+    fi
+    FF_MAKE_TOOLCHAIN_FLAGS="--install-dir $FF_TOOLCHAIN_PATH --arch $ARCH --api $FF_ANDROID_PLATFORM"
+    python $ANDROID_NDK/build/tools/make_standalone_toolchain.py \
+        $FF_MAKE_TOOLCHAIN_FLAGS
+fi
 
 #--------------------
 echo ""
 echo "--------------------"
 echo "[*] check ffmpeg env"
 echo "--------------------"
-export PATH=$FF_TOOLCHAIN_PATH/bin/:$PATH
+FF_TOOLCHAIN_PATH_BIN=$FF_TOOLCHAIN_PATH/bin
+export PATH=$FF_TOOLCHAIN_PATH_BIN:$PATH
 #export CC="ccache ${FF_CROSS_PREFIX}-gcc"
-export CC="${FF_CROSS_PREFIX}-gcc"
-export LD=${FF_CROSS_PREFIX}-ld
-export AR=${FF_CROSS_PREFIX}-ar
-export STRIP=${FF_CROSS_PREFIX}-strip
+export CC=${FF_TOOLCHAIN_PATH_BIN}/${FF_CROSS_PREFIX}-${FF_CC}
+export LD=${FF_TOOLCHAIN_PATH_BIN}/${FF_CROSS_PREFIX}-ld
+export AR=${FF_TOOLCHAIN_PATH_BIN}/${FF_CROSS_PREFIX}-ar
+export STRIP=${FF_TOOLCHAIN_PATH_BIN}/${FF_CROSS_PREFIX}-strip
+NM=${FF_TOOLCHAIN_PATH_BIN}/${FF_CROSS_PREFIX}-nm
+RANLIB=${FF_TOOLCHAIN_PATH_BIN}/${FF_CROSS_PREFIX}-ranlib
+if [ ! -f "$AR" ]; then
+    ln -s ${FF_TOOLCHAIN_PATH_BIN}/llvm-ar $AR
+fi
+if [ ! -f "$STRIP" ]; then
+    ln -s ${FF_TOOLCHAIN_PATH_BIN}/llvm-strip $STRIP
+fi
+if [ ! -f "$NM" ]; then
+    ln -s ${FF_TOOLCHAIN_PATH_BIN}/llvm-nm $NM
+fi
+if [ ! -f "$RANLIB" ]; then
+    ln -s ${FF_TOOLCHAIN_PATH_BIN}/llvm-ranlib $RANLIB
+fi
 
 FF_CFLAGS="-O3 -Wall -pipe \
     -std=c99 \
@@ -232,14 +243,13 @@ FF_CFLAGS="-O3 -Wall -pipe \
 #FF_CFLAGS="$FF_CFLAGS -finline-limit=300"
 
 export COMMON_FF_CFG_FLAGS=
-. $FF_BUILD_ROOT/../../config/module.sh
-
+source $FF_BUILD_ROOT/../../config/module.sh
 
 #--------------------
 # with openssl
 if [ -f "${FF_DEP_OPENSSL_LIB}/libssl.a" ]; then
     echo "OpenSSL detected"
-# FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-nonfree"
+    # FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-nonfree"
     FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-openssl"
 
     FF_CFLAGS="$FF_CFLAGS -I${FF_DEP_OPENSSL_INC}"
@@ -276,15 +286,15 @@ else
 fi
 
 case "$FF_BUILD_OPT" in
-    debug)
-        FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-optimizations"
-        FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-debug"
-        FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-small"
+debug)
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-optimizations"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-debug"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-small"
     ;;
-    *)
-        FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-optimizations"
-        FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-debug"
-        FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-small"
+*)
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-optimizations"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-debug"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-small"
     ;;
 esac
 
@@ -295,14 +305,14 @@ echo "[*] configurate ffmpeg"
 echo "--------------------"
 cd $FF_SOURCE
 if [ -f "./config.h" ]; then
-    echo 'reuse configure'
-else
-    which $CC
-    ./configure $FF_CFG_FLAGS \
-        --extra-cflags="$FF_CFLAGS $FF_EXTRA_CFLAGS" \
-        --extra-ldflags="$FF_DEP_LIBS $FF_EXTRA_LDFLAGS"
-    # make clean
+    echo clean $(pwd)/config.h
+    make distclean
 fi
+which $CC
+./configure $FF_CFG_FLAGS \
+    --extra-cflags="$FF_CFLAGS $FF_EXTRA_CFLAGS" \
+    --extra-ldflags="$FF_DEP_LIBS $FF_EXTRA_LDFLAGS"
+# make clean
 
 #--------------------
 echo ""
@@ -310,7 +320,7 @@ echo "--------------------"
 echo "[*] compile ffmpeg"
 echo "--------------------"
 cp config.* $FF_PREFIX
-make $FF_MAKE_FLAGS > /dev/null
+make $FF_MAKE_FLAGS >/dev/null
 make install
 mkdir -p $FF_PREFIX/include/libffmpeg
 cp -f config.h $FF_PREFIX/include/libffmpeg/config.h
@@ -324,18 +334,16 @@ echo $FF_EXTRA_LDFLAGS
 
 FF_C_OBJ_FILES=
 FF_ASM_OBJ_FILES=
-for MODULE_DIR in $FF_MODULE_DIRS
-do
+for MODULE_DIR in $FF_MODULE_DIRS; do
     C_OBJ_FILES="$MODULE_DIR/*.o"
-    if ls $C_OBJ_FILES 1> /dev/null 2>&1; then
+    if ls $C_OBJ_FILES 1>/dev/null 2>&1; then
         echo "link $MODULE_DIR/*.o"
         FF_C_OBJ_FILES="$FF_C_OBJ_FILES $C_OBJ_FILES"
     fi
 
-    for ASM_SUB_DIR in $FF_ASSEMBLER_SUB_DIRS
-    do
+    for ASM_SUB_DIR in $FF_ASSEMBLER_SUB_DIRS; do
         ASM_OBJ_FILES="$MODULE_DIR/$ASM_SUB_DIR/*.o"
-        if ls $ASM_OBJ_FILES 1> /dev/null 2>&1; then
+        if ls $ASM_OBJ_FILES 1>/dev/null 2>&1; then
             echo "link $MODULE_DIR/$ASM_SUB_DIR/*.o"
             FF_ASM_OBJ_FILES="$FF_ASM_OBJ_FILES $ASM_OBJ_FILES"
         fi
@@ -352,9 +360,9 @@ $CC -lm -lz -shared --sysroot=$FF_SYSROOT -Wl,--no-undefined -Wl,-z,noexecstack 
 mysedi() {
     f=$1
     exp=$2
-    n=`basename $f`
+    n=$(basename $f)
     cp $f /tmp/$n
-    sed $exp /tmp/$n > $f
+    sed $exp /tmp/$n >$f
     rm /tmp/$n
 }
 
@@ -373,7 +381,7 @@ for f in $FF_PREFIX/lib/pkgconfig/*.pc; do
         continue
     fi
     cp $f $FF_PREFIX/shared/lib/pkgconfig
-    f=$FF_PREFIX/shared/lib/pkgconfig/`basename $f`
+    f=$FF_PREFIX/shared/lib/pkgconfig/$(basename $f)
     # OSX sed doesn't have in-place(-i)
     mysedi $f 's/\/output/\/output\/shared/g'
     mysedi $f 's/-lavcodec/-lijkffmpeg/g'

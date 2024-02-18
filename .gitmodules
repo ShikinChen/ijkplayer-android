@@ -1,12 +1,12 @@
-[submodule "extra/FFmpeg"]
-	path = extra/FFmpeg
-	url = https://github.com/ShikinChen/FFmpeg.git
-	branch = ff5.1.4--ijk0.8.8
-[submodule "extra/soundtouch"]
-	path = extra/soundtouch
+[submodule "ijkmedia/ijksoundtouch"]
+	path = ijkmedia/ijksoundtouch
 	url = https://github.com/ShikinChen/soundtouch.git
 	branch = ijk-r0.1.2-dev
-[submodule "extra/libyuv"]
-	path = extra/libyuv
+[submodule "ijkmedia/ijkyuv"]
+	path = ijkmedia/ijkyuv
 	url = https://github.com/ShikinChen/libyuv.git
 	branch = ijk-r0.2.1-dev
+[submodule "extra/ffmpeg"]
+	path = extra/ffmpeg
+	url = https://github.com/ShikinChen/FFmpeg.git
+	branch = ff5.1.4--ijk0.8.8

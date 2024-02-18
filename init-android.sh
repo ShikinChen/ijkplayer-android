@@ -30,7 +30,7 @@ git --version
 echo "== pull ffmpeg base =="
 sh $TOOLS/pull-repo-base.sh $IJK_FFMPEG_UPSTREAM $IJK_FFMPEG_LOCAL_REPO
 cd ${IJK_FFMPEG_LOCAL_REPO}
-git checkout ${IJK_FFMPEG_COMMIT} -B ijkplayer
+git checkout ${IJK_FFMPEG_COMMIT}
 cd -
 
 function pull_fork() {

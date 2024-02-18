@@ -1,19 +1,19 @@
 # ijkplayer
 
-### My Build Environment
+### 构建环境
 - Common
- - Mac OS X 11.3
+ - Mac OS X 14.3
 - Android
- - [NDK r10e](http://developer.android.com/tools/sdk/ndk/index.html)
- - Android Studio 2020.3.1
- - Gradle 6.5
+ - [NDK r24](https://github.com/android/ndk/wiki/Unsupported-Downloads)
+ - Android Studio 2023.1.1 Patch 2
+ - Gradle 7.2
  - Xcode 12.5.1
 - [HomeBrew](http://brew.sh)
  - ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
  - brew install git
 
 
-### Before Build
+### 构建前配置
 ```
 # install homebrew, git, yasm
 ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
@@ -27,24 +27,23 @@ brew install yasm
 # on Cygwin (unmaintained)
 # install git, make, yasm
 ```
+### 拉取源码
+```
+git clone https://github.com/ShikinChen/ijkplayer-android --recursive
+```
 
-### Build Android
+### 构建和导入
 ```
 git clone https://github.com/ShikinChen/ijkplayer-android
 cd ijkplayer-android
 
-./init-android.sh
-
-#编译ffmpeg一定要使用ndk r17
-export ANDROID_NDK=NDK r17的路径
+#编译ffmpeg一定要使用ndk r24
+export ANDROID_NDK=NDK r24的路径
 
 cd android/contrib
-./compile-ffmpeg.sh clean
 ./compile-ffmpeg.sh arm64
 
-//会报 tools/do-compile-ffmpeg.sh: line 317: 40808 Segmentation fault: 11  make $FF_MAKE_FLAGS > /dev/null 错误再执行一次
-./compile-ffmpeg.sh arm64
-
+#可选
 cd ..
 ./compile-ijk.sh arm64
 

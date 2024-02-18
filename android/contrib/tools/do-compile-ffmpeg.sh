@@ -52,7 +52,7 @@ FF_DEP_LIBSOXR_LIB=
 
 FF_CFG_FLAGS=
 
-FF_EXTRA_CFLAGS="-D__ANDROID_API__=21"
+FF_EXTRA_CFLAGS="-D__ANDROID_API__=$FF_ANDROID_PLATFORM"
 FF_EXTRA_LDFLAGS=
 FF_DEP_LIBS=
 
@@ -73,7 +73,7 @@ FF_CC=$IJK_CC
 FF_IS_NOT_SUPPORT_ARM=$IJK_IS_NOT_SUPPORT_ARM
 
 if $FF_IS_NOT_SUPPORT_ARM && [ "$FF_ARCH" = "armv7a" ]; then
-    echo "ndk ${IJK_NDK_REL} not support arm"
+    echo "ndk ${IJK_NDK_REL} not support armv7a"
     exit 1
 fi
 
@@ -121,7 +121,7 @@ elif [ "$FF_ARCH" = "x86_64" ]; then
     FF_CROSS_PREFIX=x86_64-linux-android
     FF_TOOLCHAIN_NAME=${FF_CROSS_PREFIX}-${FF_GCC_64_VER}
 
-    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=x86_64 --disable-neon"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=x86_64 --disable-neon --disable-asm --disable-x86asm"
 
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS"
     FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS"
@@ -282,6 +282,7 @@ FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-cross-compile"
 FF_CFG_FLAGS="$FF_CFG_FLAGS --target-os=linux"
 FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-pic"
 FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-pthreads"
+FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-vulkan"
 # FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-symver"
 
 if [ "$FF_ARCH" = "x86" ]; then

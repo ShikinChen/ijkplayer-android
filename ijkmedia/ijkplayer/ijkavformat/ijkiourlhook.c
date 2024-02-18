@@ -20,6 +20,10 @@
  */
 
 #include <assert.h>
+#include <inttypes.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 #include "ijkiourl.h"
 #include "ijkioprotocol.h"
 #include "ijkplayer/ijkavutil/ijkutils.h"

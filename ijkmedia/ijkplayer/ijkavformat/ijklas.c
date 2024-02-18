@@ -21,7 +21,7 @@
 #include "libavutil/time.h"
 #include "libavformat/avformat.h"
 #include "libavformat/url.h"
-#include "libavformat/avio_internal.h"
+#include "libavformat/avio.h"
 #include "libavformat/id3v2.h"
 #include "libavformat/flv.h"
 

@@ -72,7 +72,7 @@ FF_GCC_64_VER=$IJK_GCC_64_VER
 FF_CC=$IJK_CC
 FF_IS_NOT_SUPPORT_ARM=$IJK_IS_NOT_SUPPORT_ARM
 
-if $FF_IS_NOT_SUPPORT_ARM; then
+if $FF_IS_NOT_SUPPORT_ARM && [ "$FF_ARCH" = "armv7a" ]; then
     echo "ndk ${IJK_NDK_REL} not support arm"
     exit 1
 fi
@@ -175,28 +175,34 @@ CYGWIN_NT-*)
     FF_PREFIX="$(cygpath -am $FF_PREFIX)"
     ;;
 esac
-
+if [ ! -d "$FF_PREFIX" ]; then
+    rm -rf $FF_PREFIX
+fi
 mkdir -p $FF_PREFIX
 # mkdir -p $FF_SYSROOT
 
-if [ -d "$FF_TOOLCHAIN_PATH" ]; then
-    rm -rf $FF_TOOLCHAIN_PATH
-fi
-if [ "$FF_CC" = "gcc" ]; then
-    if [ ! -f "$FF_TOOLCHAIN_TOUCH" ]; then
-        $ANDROID_NDK/build/tools/make-standalone-toolchain.sh \
-            $FF_MAKE_TOOLCHAIN_FLAGS \
-            --platform=android-$FF_ANDROID_PLATFORM \
-            --toolchain=$FF_TOOLCHAIN_NAME
+FF_TOOLCHAIN_TOUCH="$FF_TOOLCHAIN_PATH/$IJK_NDK_REL"
+if [ ! -f "$FF_TOOLCHAIN_TOUCH" ]; then
+    if [ -d "$FF_TOOLCHAIN_PATH" ]; then
+        rm -rf $FF_TOOLCHAIN_PATH
     fi
-else
-    ARCH=$FF_ARCH
-    if [ "$FF_ARCH" = "armv7a" ]; then
-        ARCH=arm
+    if [ "$FF_CC" = "gcc" ]; then
+        if [ ! -f "$FF_TOOLCHAIN_TOUCH" ]; then
+            $ANDROID_NDK/build/tools/make-standalone-toolchain.sh \
+                $FF_MAKE_TOOLCHAIN_FLAGS \
+                --platform=android-$FF_ANDROID_PLATFORM \
+                --toolchain=$FF_TOOLCHAIN_NAME
+        fi
+    else
+        ARCH=$FF_ARCH
+        if [ "$FF_ARCH" = "armv7a" ]; then
+            ARCH=arm
+        fi
+        FF_MAKE_TOOLCHAIN_FLAGS="--install-dir $FF_TOOLCHAIN_PATH --arch $ARCH --api $FF_ANDROID_PLATFORM"
+        python $ANDROID_NDK/build/tools/make_standalone_toolchain.py \
+            $FF_MAKE_TOOLCHAIN_FLAGS
     fi
-    FF_MAKE_TOOLCHAIN_FLAGS="--install-dir $FF_TOOLCHAIN_PATH --arch $ARCH --api $FF_ANDROID_PLATFORM"
-    python $ANDROID_NDK/build/tools/make_standalone_toolchain.py \
-        $FF_MAKE_TOOLCHAIN_FLAGS
+    touch $FF_TOOLCHAIN_TOUCH
 fi
 
 #--------------------
@@ -275,6 +281,7 @@ FF_CFG_FLAGS="$FF_CFG_FLAGS --cross-prefix=${FF_CROSS_PREFIX}-"
 FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-cross-compile"
 FF_CFG_FLAGS="$FF_CFG_FLAGS --target-os=linux"
 FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-pic"
+FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-pthreads"
 # FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-symver"
 
 if [ "$FF_ARCH" = "x86" ]; then

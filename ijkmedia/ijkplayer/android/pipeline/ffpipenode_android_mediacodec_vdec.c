@@ -21,6 +21,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#include "libavcodec/bsf.h"
 #include "ffpipenode_android_mediacodec_vdec.h"
 #include "ijksdl/android/ijksdl_android_jni.h"
 #include "ijksdl/android/ijksdl_codec_android_mediaformat_java.h"
@@ -61,70 +62,69 @@ typedef struct AMC_Buf_Out {
 } AMC_Buf_Out;
 
 typedef struct IJKFF_Pipenode_Opaque {
-    FFPlayer                 *ffp;
-    IJKFF_Pipeline           *pipeline;
-    Decoder                  *decoder;
-    SDL_Vout                 *weak_vout;
+    FFPlayer *ffp;
+    IJKFF_Pipeline *pipeline;
+    Decoder *decoder;
+    SDL_Vout *weak_vout;
 
     ijkmp_mediacodecinfo_context mcc;
 
-    jobject                   jsurface;
-    SDL_AMediaFormat         *input_aformat;
-    SDL_AMediaCodec          *acodec;
-    SDL_AMediaFormat         *output_aformat;
-    char                      acodec_name[128];
-    int                       frame_width;
-    int                       frame_height;
-    int                       frame_rotate_degrees;
+    jobject jsurface;
+    SDL_AMediaFormat *input_aformat;
+    SDL_AMediaCodec *acodec;
+    SDL_AMediaFormat *output_aformat;
+    char acodec_name[128];
+    int frame_width;
+    int frame_height;
+    int frame_rotate_degrees;
 
-    AVCodecContext           *avctx; // not own
-    AVCodecParameters        *codecpar;
-    AVBitStreamFilterContext *bsfc;  // own
+    AVCodecContext *avctx; // not own
+    AVCodecParameters *codecpar;
+    AVBSFContext *bsfc;  // own
 
 #if AMC_USE_AVBITSTREAM_FILTER
     uint8_t                  *orig_extradata;
     int                       orig_extradata_size;
 #else
-    size_t                    nal_size;
+    size_t nal_size;
 #endif
 
-    SDL_Thread               _enqueue_thread;
-    SDL_Thread               *enqueue_thread;
+    SDL_Thread _enqueue_thread;
+    SDL_Thread *enqueue_thread;
 
-    SDL_mutex                *acodec_mutex;
-    SDL_cond                 *acodec_cond;
+    SDL_mutex *acodec_mutex;
+    SDL_cond *acodec_cond;
 
-    volatile bool             acodec_flush_request;
-    volatile bool             acodec_reconfigure_request;
+    volatile bool acodec_flush_request;
+    volatile bool acodec_reconfigure_request;
 
-    SDL_mutex                *acodec_first_dequeue_output_mutex;
-    SDL_cond                 *acodec_first_dequeue_output_cond;
-    volatile bool             acodec_first_dequeue_output_request;
-    bool                      aformat_need_recreate;
+    SDL_mutex *acodec_first_dequeue_output_mutex;
+    SDL_cond *acodec_first_dequeue_output_cond;
+    volatile bool acodec_first_dequeue_output_request;
+    bool aformat_need_recreate;
 
-    SDL_mutex                *any_input_mutex;
-    SDL_cond                 *any_input_cond;
+    SDL_mutex *any_input_mutex;
+    SDL_cond *any_input_cond;
 
-    int                       input_packet_count;
-    int                       input_error_count;
-    int                       output_error_count;
+    int input_packet_count;
+    int input_error_count;
+    int output_error_count;
 
-    bool                      quirk_reconfigure_with_new_codec;
+    bool quirk_reconfigure_with_new_codec;
 
-    int                       n_buf_out;
-    AMC_Buf_Out               *amc_buf_out;
-    int                       off_buf_out;
-    double                    last_queued_pts;
+    int n_buf_out;
+    AMC_Buf_Out *amc_buf_out;
+    int off_buf_out;
+    double last_queued_pts;
 
-    SDL_SpeedSampler          sampler;
-    volatile bool             abort;
+    SDL_SpeedSampler sampler;
+    volatile bool abort;
 } IJKFF_Pipenode_Opaque;
 
-static SDL_AMediaCodec *create_codec_l(JNIEnv *env, IJKFF_Pipenode *node)
-{
-    IJKFF_Pipenode_Opaque        *opaque   = node->opaque;
-    ijkmp_mediacodecinfo_context *mcc      = &opaque->mcc;
-    SDL_AMediaCodec              *acodec   = NULL;
+static SDL_AMediaCodec *create_codec_l(JNIEnv *env, IJKFF_Pipenode *node) {
+    IJKFF_Pipenode_Opaque *opaque = node->opaque;
+    ijkmp_mediacodecinfo_context *mcc = &opaque->mcc;
+    SDL_AMediaCodec *acodec = NULL;
 
     if (opaque->jsurface == NULL) {
         // we don't need real codec if we don't have a surface
@@ -132,7 +132,8 @@ static SDL_AMediaCodec *create_codec_l(JNIEnv *env, IJKFF_Pipenode *node)
     } else {
         acodec = SDL_AMediaCodecJava_createByCodecName(env, mcc->codec_name);
         if (acodec) {
-            strncpy(opaque->acodec_name, mcc->codec_name, sizeof(opaque->acodec_name) / sizeof(*opaque->acodec_name));
+            strncpy(opaque->acodec_name, mcc->codec_name,
+                    sizeof(opaque->acodec_name) / sizeof(*opaque->acodec_name));
             opaque->acodec_name[sizeof(opaque->acodec_name) / sizeof(*opaque->acodec_name) - 1] = 0;
         }
     }
@@ -159,29 +160,32 @@ static SDL_AMediaCodec *create_codec_l(JNIEnv *env, IJKFF_Pipenode *node)
     }
 
     if (opaque->frame_rotate_degrees == 90 || opaque->frame_rotate_degrees == 270) {
-        opaque->frame_width  = opaque->codecpar->height;
+        opaque->frame_width = opaque->codecpar->height;
         opaque->frame_height = opaque->codecpar->width;
     } else {
-        opaque->frame_width  = opaque->codecpar->width;
+        opaque->frame_width = opaque->codecpar->width;
         opaque->frame_height = opaque->codecpar->height;
     }
 
     return acodec;
 }
 
-static int recreate_format_l(JNIEnv *env, IJKFF_Pipenode *node)
-{
-    IJKFF_Pipenode_Opaque *opaque         = node->opaque;
-    FFPlayer              *ffp            = opaque->ffp;
-    int                    rotate_degrees = 0;
+static int recreate_format_l(JNIEnv *env, IJKFF_Pipenode *node) {
+    IJKFF_Pipenode_Opaque *opaque = node->opaque;
+    FFPlayer *ffp = opaque->ffp;
+    int rotate_degrees = 0;
 
-    ALOGI("AMediaFormat: %s, %dx%d\n", opaque->mcc.mime_type, opaque->codecpar->width, opaque->codecpar->height);
+    ALOGI("AMediaFormat: %s, %dx%d\n", opaque->mcc.mime_type, opaque->codecpar->width,
+          opaque->codecpar->height);
     SDL_AMediaFormat_deleteP(&opaque->output_aformat);
-    opaque->input_aformat = SDL_AMediaFormatJava_createVideoFormat(env, opaque->mcc.mime_type, opaque->codecpar->width, opaque->codecpar->height);
+    opaque->input_aformat = SDL_AMediaFormatJava_createVideoFormat(env, opaque->mcc.mime_type,
+                                                                   opaque->codecpar->width,
+                                                                   opaque->codecpar->height);
     if (opaque->codecpar->extradata && opaque->codecpar->extradata_size > 0) {
         if ((opaque->codecpar->codec_id == AV_CODEC_ID_H264 && opaque->codecpar->extradata[0] == 1)
-            || (opaque->codecpar->codec_id == AV_CODEC_ID_HEVC && opaque->codecpar->extradata_size > 3
-                && (opaque->codecpar->extradata[0] == 1 || opaque->codecpar->extradata[1] == 1))) {
+            ||
+            (opaque->codecpar->codec_id == AV_CODEC_ID_HEVC && opaque->codecpar->extradata_size > 3
+             && (opaque->codecpar->extradata[0] == 1 || opaque->codecpar->extradata[1] == 1))) {
 #if AMC_USE_AVBITSTREAM_FILTER
             if (opaque->codecpar->codec_id == AV_CODEC_ID_H264) {
                 opaque->bsfc = av_bitstream_filter_init("h264_mp4toannexb");
@@ -208,31 +212,36 @@ static int recreate_format_l(JNIEnv *env, IJKFF_Pipenode *node)
             }
             SDL_AMediaFormat_setBuffer(opaque->input_aformat, "csd-0", opaque->codecpar->extradata, opaque->codecpar->extradata_size);
 #else
-            size_t   sps_pps_size   = 0;
-            size_t   convert_size   = opaque->codecpar->extradata_size + 20;
-            uint8_t *convert_buffer = (uint8_t *)calloc(1, convert_size);
+            size_t sps_pps_size = 0;
+            size_t convert_size = opaque->codecpar->extradata_size + 20;
+            uint8_t *convert_buffer = (uint8_t *) calloc(1, convert_size);
             if (!convert_buffer) {
                 ALOGE("%s:sps_pps_buffer: alloc failed\n", __func__);
                 goto fail;
             }
             if (opaque->codecpar->codec_id == AV_CODEC_ID_H264) {
-                if (0 != convert_sps_pps(opaque->codecpar->extradata, opaque->codecpar->extradata_size,
-                                         convert_buffer, convert_size,
-                                         &sps_pps_size, &opaque->nal_size)) {
+                if (0 !=
+                    convert_sps_pps(opaque->codecpar->extradata, opaque->codecpar->extradata_size,
+                                    convert_buffer, convert_size,
+                                    &sps_pps_size, &opaque->nal_size)) {
                     ALOGE("%s:convert_sps_pps: failed\n", __func__);
                     goto fail;
                 }
             } else {
-                if (0 != convert_hevc_nal_units(opaque->codecpar->extradata, opaque->codecpar->extradata_size,
+                if (0 != convert_hevc_nal_units(opaque->codecpar->extradata,
+                                                opaque->codecpar->extradata_size,
                                                 convert_buffer, convert_size,
                                                 &sps_pps_size, &opaque->nal_size)) {
                     ALOGE("%s:convert_hevc_nal_units: failed\n", __func__);
                     goto fail;
                 }
             }
-            SDL_AMediaFormat_setBuffer(opaque->input_aformat, "csd-0", convert_buffer, sps_pps_size);
-            for(int i = 0; i < sps_pps_size; i+=4) {
-                ALOGE("csd-0[%d]: %02x%02x%02x%02x\n", (int)sps_pps_size, (int)convert_buffer[i+0], (int)convert_buffer[i+1], (int)convert_buffer[i+2], (int)convert_buffer[i+3]);
+            SDL_AMediaFormat_setBuffer(opaque->input_aformat, "csd-0", convert_buffer,
+                                       sps_pps_size);
+            for (int i = 0; i < sps_pps_size; i += 4) {
+                ALOGE("csd-0[%d]: %02x%02x%02x%02x\n", (int) sps_pps_size,
+                      (int) convert_buffer[i + 0], (int) convert_buffer[i + 1],
+                      (int) convert_buffer[i + 2], (int) convert_buffer[i + 3]);
             }
             free(convert_buffer);
 #endif
@@ -240,8 +249,10 @@ static int recreate_format_l(JNIEnv *env, IJKFF_Pipenode *node)
             size_t esds_dec_dscr_type_length = opaque->codecpar->extradata_size + 0x18;
             size_t esds_es_dscr_type_length = esds_dec_dscr_type_length + 0x08;
             size_t esds_size = esds_es_dscr_type_length + 0x05;
-            uint8_t *convert_buffer = (uint8_t *)calloc(1, esds_size);
-            restore_mpeg4_esds(opaque->codecpar, opaque->codecpar->extradata, opaque->codecpar->extradata_size, esds_es_dscr_type_length, esds_dec_dscr_type_length, convert_buffer);
+            uint8_t *convert_buffer = (uint8_t *) calloc(1, esds_size);
+            restore_mpeg4_esds(opaque->codecpar, opaque->codecpar->extradata,
+                               opaque->codecpar->extradata_size, esds_es_dscr_type_length,
+                               esds_dec_dscr_type_length, convert_buffer);
             SDL_AMediaFormat_setBuffer(opaque->input_aformat, "csd-0", convert_buffer, esds_size);
             free(convert_buffer);
         } else {
@@ -267,16 +278,15 @@ static int recreate_format_l(JNIEnv *env, IJKFF_Pipenode *node)
     }
 
     return 0;
-fail:
+    fail:
     return -1;
 }
 
-static int reconfigure_codec_l(JNIEnv *env, IJKFF_Pipenode *node, jobject new_surface)
-{
-    IJKFF_Pipenode_Opaque *opaque   = node->opaque;
-    int                    ret      = 0;
-    sdl_amedia_status_t    amc_ret  = 0;
-    jobject                prev_jsurface = NULL;
+static int reconfigure_codec_l(JNIEnv *env, IJKFF_Pipenode *node, jobject new_surface) {
+    IJKFF_Pipenode_Opaque *opaque = node->opaque;
+    int ret = 0;
+    sdl_amedia_status_t amc_ret = 0;
+    jobject prev_jsurface = NULL;
 
     prev_jsurface = opaque->jsurface;
     if (new_surface) {
@@ -321,7 +331,8 @@ static int reconfigure_codec_l(JNIEnv *env, IJKFF_Pipenode *node, jobject new_su
         assert(opaque->weak_vout);
     }
 
-    amc_ret = SDL_AMediaCodec_configure_surface(env, opaque->acodec, opaque->input_aformat, opaque->jsurface, NULL, 0);
+    amc_ret = SDL_AMediaCodec_configure_surface(env, opaque->acodec, opaque->input_aformat,
+                                                opaque->jsurface, NULL, 0);
     if (amc_ret != SDL_AMEDIA_OK) {
         ALOGE("%s:configure_surface: failed\n", __func__);
         ret = -1;
@@ -340,17 +351,16 @@ static int reconfigure_codec_l(JNIEnv *env, IJKFF_Pipenode *node, jobject new_su
     SDL_VoutAndroid_setAMediaCodec(opaque->weak_vout, opaque->acodec);
 
     ret = 0;
-fail:
+    fail:
     return ret;
 }
 
-static int configure_codec_l(JNIEnv *env, IJKFF_Pipenode *node, jobject new_surface)
-{
-    IJKFF_Pipenode_Opaque        *opaque = node->opaque;
-    int                              ret = 0;
-    sdl_amedia_status_t          amc_ret = 0;
-    jobject                prev_jsurface = NULL;
-    ijkmp_mediacodecinfo_context *mcc    = &opaque->mcc;
+static int configure_codec_l(JNIEnv *env, IJKFF_Pipenode *node, jobject new_surface) {
+    IJKFF_Pipenode_Opaque *opaque = node->opaque;
+    int ret = 0;
+    sdl_amedia_status_t amc_ret = 0;
+    jobject prev_jsurface = NULL;
+    ijkmp_mediacodecinfo_context *mcc = &opaque->mcc;
 
     prev_jsurface = opaque->jsurface;
     if (new_surface) {
@@ -367,7 +377,8 @@ static int configure_codec_l(JNIEnv *env, IJKFF_Pipenode *node, jobject new_surf
         goto fail;
     }
 
-    strncpy(opaque->acodec_name, mcc->codec_name, sizeof(opaque->acodec_name) / sizeof(*opaque->acodec_name));
+    strncpy(opaque->acodec_name, mcc->codec_name,
+            sizeof(opaque->acodec_name) / sizeof(*opaque->acodec_name));
     opaque->acodec_name[sizeof(opaque->acodec_name) / sizeof(*opaque->acodec_name) - 1] = 0;
 
     // QUIRK: always recreate MediaCodec for reconfigure
@@ -380,13 +391,14 @@ static int configure_codec_l(JNIEnv *env, IJKFF_Pipenode *node, jobject new_surf
     }
 
     if (opaque->frame_rotate_degrees == 90 || opaque->frame_rotate_degrees == 270) {
-        opaque->frame_width  = opaque->codecpar->height;
+        opaque->frame_width = opaque->codecpar->height;
         opaque->frame_height = opaque->codecpar->width;
     } else {
-        opaque->frame_width  = opaque->codecpar->width;
+        opaque->frame_width = opaque->codecpar->width;
         opaque->frame_height = opaque->codecpar->height;
     }
-    amc_ret = SDL_AMediaCodec_configure_surface(env, opaque->acodec, opaque->input_aformat, opaque->jsurface, NULL, 0);
+    amc_ret = SDL_AMediaCodec_configure_surface(env, opaque->acodec, opaque->input_aformat,
+                                                opaque->jsurface, NULL, 0);
     if (amc_ret != SDL_AMEDIA_OK) {
         ALOGE("%s:configure_surface: failed\n", __func__);
         ret = -1;
@@ -404,7 +416,7 @@ static int configure_codec_l(JNIEnv *env, IJKFF_Pipenode *node, jobject new_surf
     SDL_VoutAndroid_setAMediaCodec(opaque->weak_vout, opaque->acodec);
 
     ret = 0;
-fail:
+    fail:
     return ret;
 }
 
@@ -420,51 +432,52 @@ static int reconfigure_codec(JNIEnv *env, IJKFF_Pipenode *node)
 #endif
 
 static int amc_fill_frame(
-    IJKFF_Pipenode            *node,
-    AVFrame                   *frame,
-    int                       *got_frame,
-    int                        output_buffer_index,
-    int                        acodec_serial,
-    SDL_AMediaCodecBufferInfo *buffer_info)
-{
-    IJKFF_Pipenode_Opaque *opaque     = node->opaque;
-    FFPlayer              *ffp        = opaque->ffp;
-    VideoState            *is         = ffp->is;
+        IJKFF_Pipenode *node,
+        AVFrame *frame,
+        int *got_frame,
+        int output_buffer_index,
+        int acodec_serial,
+        SDL_AMediaCodecBufferInfo *buffer_info) {
+    IJKFF_Pipenode_Opaque *opaque = node->opaque;
+    FFPlayer *ffp = opaque->ffp;
+    VideoState *is = ffp->is;
 
-    frame->opaque = SDL_VoutAndroid_obtainBufferProxy(opaque->weak_vout, acodec_serial, output_buffer_index, buffer_info);
+    frame->opaque = SDL_VoutAndroid_obtainBufferProxy(opaque->weak_vout, acodec_serial,
+                                                      output_buffer_index, buffer_info);
     if (!frame->opaque)
         goto fail;
 
-    frame->width  = opaque->frame_width;
+    frame->width = opaque->frame_width;
     frame->height = opaque->frame_height;
     frame->format = IJK_AV_PIX_FMT__ANDROID_MEDIACODEC;
     frame->sample_aspect_ratio = opaque->codecpar->sample_aspect_ratio;
-    frame->pts    = av_rescale_q(buffer_info->presentationTimeUs, AV_TIME_BASE_Q, is->video_st->time_base);
+    frame->pts = av_rescale_q(buffer_info->presentationTimeUs, AV_TIME_BASE_Q,
+                              is->video_st->time_base);
     if (frame->pts < 0)
         frame->pts = AV_NOPTS_VALUE;
     // ALOGE("%s: %f", __func__, (float)frame->pts);
 
     *got_frame = 1;
     return 0;
-fail:
+    fail:
     *got_frame = 0;
     return -1;
 }
 
-static int feed_input_buffer2(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, int *enqueue_count)
-{
-    IJKFF_Pipenode_Opaque *opaque   = node->opaque;
-    FFPlayer              *ffp      = opaque->ffp;
-    IJKFF_Pipeline        *pipeline = opaque->pipeline;
-    VideoState            *is       = ffp->is;
-    Decoder               *d        = &is->viddec;
-    PacketQueue           *q        = d->queue;
-    sdl_amedia_status_t    amc_ret  = 0;
-    int                    ret      = 0;
-    ssize_t  input_buffer_index     = 0;
-    ssize_t  copy_size              = 0;
-    int64_t  time_stamp             = 0;
-    uint32_t queue_flags            = 0;
+static int
+feed_input_buffer2(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, int *enqueue_count) {
+    IJKFF_Pipenode_Opaque *opaque = node->opaque;
+    FFPlayer *ffp = opaque->ffp;
+    IJKFF_Pipeline *pipeline = opaque->pipeline;
+    VideoState *is = ffp->is;
+    Decoder *d = &is->viddec;
+    PacketQueue *q = d->queue;
+    sdl_amedia_status_t amc_ret = 0;
+    int ret = 0;
+    ssize_t input_buffer_index = 0;
+    ssize_t copy_size = 0;
+    int64_t time_stamp = 0;
+    uint32_t queue_flags = 0;
 
     if (enqueue_count)
         *enqueue_count = 0;
@@ -483,7 +496,8 @@ static int feed_input_buffer2(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs,
         do {
             if (d->queue->nb_packets == 0)
                 SDL_CondSignal(d->empty_queue_cond);
-            if (ffp_packet_queue_get_or_buffering(ffp, d->queue, &pkt, &d->pkt_serial, &d->finished) < 0) {
+            if (ffp_packet_queue_get_or_buffering(ffp, d->queue, &pkt, &d->pkt_serial,
+                                                  &d->finished) < 0) {
                 ret = -1;
                 goto fail;
             }
@@ -506,24 +520,24 @@ static int feed_input_buffer2(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs,
                 d->next_pts_tb = d->start_pts_tb;
             }
         } while (ffp_is_flush_packet(&pkt) || d->queue->serial != d->pkt_serial);
-        av_packet_split_side_data(&pkt);
+//        av_packet_split_side_data(&pkt);
         av_packet_unref(&d->pkt);
         d->pkt_temp = d->pkt = pkt;
         d->packet_pending = 1;
 
         if (opaque->ffp->mediacodec_handle_resolution_change &&
             opaque->codecpar->codec_id == AV_CODEC_ID_H264) {
-            uint8_t  *size_data      = NULL;
-            int       size_data_size = 0;
-            AVPacket *avpkt          = &d->pkt_temp;
+            uint8_t *size_data = NULL;
+            int size_data_size = 0;
+            AVPacket *avpkt = &d->pkt_temp;
             size_data = av_packet_get_side_data(avpkt, AV_PKT_DATA_NEW_EXTRADATA, &size_data_size);
             // minimum avcC(sps,pps) = 7
             if (size_data && size_data_size >= 7) {
-                int             got_picture = 0;
-                AVFrame        *frame      = av_frame_alloc();
-                AVDictionary   *codec_opts = NULL;
-                const AVCodec  *codec      = opaque->decoder->avctx->codec;
-                AVCodecContext *new_avctx  = avcodec_alloc_context3(codec);
+                int got_picture = 0;
+                AVFrame *frame = av_frame_alloc();
+                AVDictionary *codec_opts = NULL;
+                const AVCodec *codec = opaque->decoder->avctx->codec;
+                AVCodecContext *new_avctx = avcodec_alloc_context3(codec);
                 int change_ret = 0;
 
                 if (!new_avctx)
@@ -546,15 +560,22 @@ static int feed_input_buffer2(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs,
                     avcodec_free_context(&new_avctx);
                     return change_ret;
                 }
-
-                change_ret = avcodec_decode_video2(new_avctx, frame, &got_picture, avpkt);
+//                change_ret = avcodec_decode_video2(new_avctx, frame, &got_picture, avpkt);
+                change_ret = avcodec_send_frame(new_avctx, frame);
+                while (change_ret >= 0) {
+                    change_ret = avcodec_receive_packet(new_avctx, avpkt);
+                    if (change_ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || change_ret < 0) {
+                        break;
+                    }
+                }
                 if (change_ret < 0) {
                     avcodec_free_context(&new_avctx);
                     return change_ret;
                 } else {
-                    if (opaque->codecpar->width  != new_avctx->width &&
+                    if (opaque->codecpar->width != new_avctx->width &&
                         opaque->codecpar->height != new_avctx->height) {
-                        ALOGW("AV_PKT_DATA_NEW_EXTRADATA: %d x %d\n", new_avctx->width, new_avctx->height);
+                        ALOGW("AV_PKT_DATA_NEW_EXTRADATA: %d x %d\n", new_avctx->width,
+                              new_avctx->height);
                         avcodec_parameters_from_context(opaque->codecpar, new_avctx);
                         opaque->aformat_need_recreate = true;
                         ffpipeline_set_surface_need_reconfigure_l(pipeline, true);
@@ -566,8 +587,10 @@ static int feed_input_buffer2(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs,
             }
         }
 
-        if (opaque->codecpar->codec_id == AV_CODEC_ID_H264 || opaque->codecpar->codec_id == AV_CODEC_ID_HEVC) {
-            convert_h264_to_annexb(d->pkt_temp.data, d->pkt_temp.size, opaque->nal_size, &convert_state);
+        if (opaque->codecpar->codec_id == AV_CODEC_ID_H264 ||
+            opaque->codecpar->codec_id == AV_CODEC_ID_HEVC) {
+            convert_h264_to_annexb(d->pkt_temp.data, d->pkt_temp.size, opaque->nal_size,
+                                   &convert_state);
             int64_t time_stamp = d->pkt_temp.pts;
             if (!time_stamp && d->pkt_temp.dts)
                 time_stamp = d->pkt_temp.dts;
@@ -593,7 +616,8 @@ static int feed_input_buffer2(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs,
 
             if (!opaque->aformat_need_recreate &&
                 (opaque->jsurface == new_surface ||
-                (opaque->jsurface && new_surface && (*env)->IsSameObject(env, new_surface, opaque->jsurface)))) {
+                 (opaque->jsurface && new_surface &&
+                  (*env)->IsSameObject(env, new_surface, opaque->jsurface)))) {
                 ALOGI("%s: same surface, reuse previous surface\n", __func__);
                 J4A_DeleteGlobalRef__p(env, &new_surface);
             } else {
@@ -639,12 +663,13 @@ static int feed_input_buffer2(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs,
             } else {
                 // enqueue fake frame
                 queue_flags |= AMEDIACODEC__BUFFER_FLAG_FAKE_FRAME;
-                copy_size    = d->pkt_temp.size;
+                copy_size = d->pkt_temp.size;
             }
         } else {
             SDL_AMediaCodecFake_flushFakeFrames(opaque->acodec);
 
-            copy_size = SDL_AMediaCodec_writeInputData(opaque->acodec, input_buffer_index, d->pkt_temp.data, d->pkt_temp.size);
+            copy_size = SDL_AMediaCodec_writeInputData(opaque->acodec, input_buffer_index,
+                                                       d->pkt_temp.data, d->pkt_temp.size);
             if (!copy_size) {
                 ALOGE("%s: SDL_AMediaCodec_getInputBuffer failed\n", __func__);
                 ret = -1;
@@ -661,7 +686,8 @@ static int feed_input_buffer2(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs,
             time_stamp = 0;
         }
         // ALOGE("queueInputBuffer, %lld\n", time_stamp);
-        amc_ret = SDL_AMediaCodec_queueInputBuffer(opaque->acodec, input_buffer_index, 0, copy_size, time_stamp, queue_flags);
+        amc_ret = SDL_AMediaCodec_queueInputBuffer(opaque->acodec, input_buffer_index, 0, copy_size,
+                                                   time_stamp, queue_flags);
         if (amc_ret != SDL_AMEDIA_OK) {
             ALOGE("%s: SDL_AMediaCodec_getInputBuffer failed\n", __func__);
             ret = -1;
@@ -686,30 +712,30 @@ static int feed_input_buffer2(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs,
         } else {
             // FIXME: detect if decode finished
             // if (!got_frame) {
-                d->packet_pending = 0;
-                d->finished = d->pkt_serial;
+            d->packet_pending = 0;
+            d->finished = d->pkt_serial;
             // }
         }
     }
 
-fail:
+    fail:
     return ret;
 }
 
-static int feed_input_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, int *enqueue_count)
-{
-    IJKFF_Pipenode_Opaque *opaque   = node->opaque;
-    FFPlayer              *ffp      = opaque->ffp;
-    IJKFF_Pipeline        *pipeline = opaque->pipeline;
-    VideoState            *is       = ffp->is;
-    Decoder               *d        = &is->viddec;
-    PacketQueue           *q        = d->queue;
-    sdl_amedia_status_t    amc_ret  = 0;
-    int                    ret      = 0;
-    ssize_t  input_buffer_index = 0;
-    ssize_t  copy_size          = 0;
-    int64_t  time_stamp         = 0;
-    uint32_t queue_flags        = 0;
+static int
+feed_input_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, int *enqueue_count) {
+    IJKFF_Pipenode_Opaque *opaque = node->opaque;
+    FFPlayer *ffp = opaque->ffp;
+    IJKFF_Pipeline *pipeline = opaque->pipeline;
+    VideoState *is = ffp->is;
+    Decoder *d = &is->viddec;
+    PacketQueue *q = d->queue;
+    sdl_amedia_status_t amc_ret = 0;
+    int ret = 0;
+    ssize_t input_buffer_index = 0;
+    ssize_t copy_size = 0;
+    int64_t time_stamp = 0;
+    uint32_t queue_flags = 0;
 
     if (enqueue_count)
         *enqueue_count = 0;
@@ -728,7 +754,8 @@ static int feed_input_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, 
         do {
             if (d->queue->nb_packets == 0)
                 SDL_CondSignal(d->empty_queue_cond);
-            if (ffp_packet_queue_get_or_buffering(ffp, d->queue, &pkt, &d->pkt_serial, &d->finished) < 0) {
+            if (ffp_packet_queue_get_or_buffering(ffp, d->queue, &pkt, &d->pkt_serial,
+                                                  &d->finished) < 0) {
                 ret = -1;
                 goto fail;
             }
@@ -754,24 +781,24 @@ static int feed_input_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, 
                 d->next_pts_tb = d->start_pts_tb;
             }
         } while (ffp_is_flush_packet(&pkt) || d->queue->serial != d->pkt_serial);
-        av_packet_split_side_data(&pkt);
+//        av_packet_split_side_data(&pkt);
         av_packet_unref(&d->pkt);
         d->pkt_temp = d->pkt = pkt;
         d->packet_pending = 1;
 
         if (opaque->ffp->mediacodec_handle_resolution_change &&
             opaque->codecpar->codec_id == AV_CODEC_ID_H264) {
-            uint8_t  *size_data      = NULL;
-            int       size_data_size = 0;
-            AVPacket *avpkt          = &d->pkt_temp;
+            uint8_t *size_data = NULL;
+            int size_data_size = 0;
+            AVPacket *avpkt = &d->pkt_temp;
             size_data = av_packet_get_side_data(avpkt, AV_PKT_DATA_NEW_EXTRADATA, &size_data_size);
             // minimum avcC(sps,pps) = 7
             if (size_data && size_data_size >= 7) {
-                int             got_picture = 0;
-                AVFrame        *frame      = av_frame_alloc();
-                AVDictionary   *codec_opts = NULL;
-                const AVCodec  *codec      = opaque->decoder->avctx->codec;
-                AVCodecContext *new_avctx  = avcodec_alloc_context3(codec);
+                int got_picture = 0;
+                AVFrame *frame = av_frame_alloc();
+                AVDictionary *codec_opts = NULL;
+                const AVCodec *codec = opaque->decoder->avctx->codec;
+                AVCodecContext *new_avctx = avcodec_alloc_context3(codec);
                 int change_ret = 0;
                 if (!new_avctx)
                     return AVERROR(ENOMEM);
@@ -794,14 +821,22 @@ static int feed_input_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, 
                     return change_ret;
                 }
 
-                change_ret = avcodec_decode_video2(new_avctx, frame, &got_picture, avpkt);
+//                change_ret = avcodec_decode_video2(new_avctx, frame, &got_picture, avpkt);
+                change_ret = avcodec_send_frame(new_avctx, frame);
+                while (change_ret >= 0) {
+                    change_ret = avcodec_receive_packet(new_avctx, avpkt);
+                    if (change_ret == AVERROR(EAGAIN) || ret == AVERROR_EOF || change_ret < 0) {
+                        break;
+                    }
+                }
                 if (change_ret < 0) {
                     avcodec_free_context(&new_avctx);
                     return change_ret;
                 } else {
-                    if (opaque->codecpar->width  != new_avctx->width &&
+                    if (opaque->codecpar->width != new_avctx->width &&
                         opaque->codecpar->height != new_avctx->height) {
-                        ALOGW("AV_PKT_DATA_NEW_EXTRADATA: %d x %d\n", new_avctx->width, new_avctx->height);
+                        ALOGW("AV_PKT_DATA_NEW_EXTRADATA: %d x %d\n", new_avctx->width,
+                              new_avctx->height);
                         avcodec_parameters_from_context(opaque->codecpar, new_avctx);
                         opaque->aformat_need_recreate = true;
                         ffpipeline_set_surface_need_reconfigure_l(pipeline, true);
@@ -850,8 +885,10 @@ static int feed_input_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, 
             d->pkt_temp.data[6],
             d->pkt_temp.data[7]);
 #endif
-        if (opaque->codecpar->codec_id == AV_CODEC_ID_H264 || opaque->codecpar->codec_id == AV_CODEC_ID_HEVC) {
-            convert_h264_to_annexb(d->pkt_temp.data, d->pkt_temp.size, opaque->nal_size, &convert_state);
+        if (opaque->codecpar->codec_id == AV_CODEC_ID_H264 ||
+            opaque->codecpar->codec_id == AV_CODEC_ID_HEVC) {
+            convert_h264_to_annexb(d->pkt_temp.data, d->pkt_temp.size, opaque->nal_size,
+                                   &convert_state);
             int64_t time_stamp = d->pkt_temp.pts;
             if (!time_stamp && d->pkt_temp.dts)
                 time_stamp = d->pkt_temp.dts;
@@ -895,7 +932,8 @@ static int feed_input_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, 
 
             if (!opaque->aformat_need_recreate &&
                 (opaque->jsurface == new_surface ||
-                (opaque->jsurface && new_surface && (*env)->IsSameObject(env, new_surface, opaque->jsurface)))) {
+                 (opaque->jsurface && new_surface &&
+                  (*env)->IsSameObject(env, new_surface, opaque->jsurface)))) {
                 ALOGI("%s: same surface, reuse previous surface\n", __func__);
                 J4A_DeleteGlobalRef__p(env, &new_surface);
             } else {
@@ -926,14 +964,16 @@ static int feed_input_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, 
 
                 SDL_LockMutex(opaque->acodec_first_dequeue_output_mutex);
                 while (!q->abort_request &&
-                    !opaque->acodec_reconfigure_request &&
-                    !opaque->acodec_flush_request &&
-                    opaque->acodec_first_dequeue_output_request) {
-                    SDL_CondWaitTimeout(opaque->acodec_first_dequeue_output_cond, opaque->acodec_first_dequeue_output_mutex, 100);
+                       !opaque->acodec_reconfigure_request &&
+                       !opaque->acodec_flush_request &&
+                       opaque->acodec_first_dequeue_output_request) {
+                    SDL_CondWaitTimeout(opaque->acodec_first_dequeue_output_cond,
+                                        opaque->acodec_first_dequeue_output_mutex, 100);
                 }
                 SDL_UnlockMutex(opaque->acodec_first_dequeue_output_mutex);
 
-                if (q->abort_request || opaque->acodec_reconfigure_request || opaque->acodec_flush_request) {
+                if (q->abort_request || opaque->acodec_reconfigure_request ||
+                    opaque->acodec_flush_request) {
                     ret = 0;
                     goto fail;
                 }
@@ -958,12 +998,13 @@ static int feed_input_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, 
             } else {
                 // enqueue fake frame
                 queue_flags |= AMEDIACODEC__BUFFER_FLAG_FAKE_FRAME;
-                copy_size    = d->pkt_temp.size;
+                copy_size = d->pkt_temp.size;
             }
         } else {
             SDL_AMediaCodecFake_flushFakeFrames(opaque->acodec);
 
-            copy_size = SDL_AMediaCodec_writeInputData(opaque->acodec, input_buffer_index, d->pkt_temp.data, d->pkt_temp.size);
+            copy_size = SDL_AMediaCodec_writeInputData(opaque->acodec, input_buffer_index,
+                                                       d->pkt_temp.data, d->pkt_temp.size);
             if (!copy_size) {
                 ALOGE("%s: SDL_AMediaCodec_getInputBuffer failed\n", __func__);
                 ret = -1;
@@ -980,7 +1021,8 @@ static int feed_input_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, 
             time_stamp = 0;
         }
         // ALOGE("queueInputBuffer, %lld\n", time_stamp);
-        amc_ret = SDL_AMediaCodec_queueInputBuffer(opaque->acodec, input_buffer_index, 0, copy_size, time_stamp, queue_flags);
+        amc_ret = SDL_AMediaCodec_queueInputBuffer(opaque->acodec, input_buffer_index, 0, copy_size,
+                                                   time_stamp, queue_flags);
         if (amc_ret != SDL_AMEDIA_OK) {
             ALOGE("%s: SDL_AMediaCodec_getInputBuffer failed\n", __func__);
             ret = -1;
@@ -1005,27 +1047,26 @@ static int feed_input_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, 
         } else {
             // FIXME: detect if decode finished
             // if (!got_frame) {
-                d->packet_pending = 0;
-                d->finished = d->pkt_serial;
+            d->packet_pending = 0;
+            d->finished = d->pkt_serial;
             // }
         }
     }
 
-fail:
+    fail:
     return ret;
 }
 
-static int enqueue_thread_func(void *arg)
-{
-    JNIEnv                *env      = NULL;
-    IJKFF_Pipenode        *node     = arg;
-    IJKFF_Pipenode_Opaque *opaque   = node->opaque;
-    FFPlayer              *ffp      = opaque->ffp;
-    VideoState            *is       = ffp->is;
-    Decoder               *d        = &is->viddec;
-    PacketQueue           *q        = d->queue;
-    int                    ret      = -1;
-    int                    dequeue_count = 0;
+static int enqueue_thread_func(void *arg) {
+    JNIEnv *env = NULL;
+    IJKFF_Pipenode *node = arg;
+    IJKFF_Pipenode_Opaque *opaque = node->opaque;
+    FFPlayer *ffp = opaque->ffp;
+    VideoState *is = ffp->is;
+    Decoder *d = &is->viddec;
+    PacketQueue *q = d->queue;
+    int ret = -1;
+    int dequeue_count = 0;
 
     if (JNI_OK != SDL_JNI_SetupThreadEnv(&env)) {
         ALOGE("%s: SetupThreadEnv failed\n", __func__);
@@ -1040,19 +1081,19 @@ static int enqueue_thread_func(void *arg)
     }
 
     ret = 0;
-fail:
+    fail:
     SDL_AMediaCodecFake_abort(opaque->acodec);
     ALOGI("MediaCodec: %s: exit: %d", __func__, ret);
     return ret;
 }
 
-static double pts_from_buffer_info(IJKFF_Pipenode *node, SDL_AMediaCodecBufferInfo *buffer_info)
-{
-    IJKFF_Pipenode_Opaque *opaque     = node->opaque;
-    FFPlayer              *ffp        = opaque->ffp;
-    VideoState            *is         = ffp->is;
-    AVRational             tb         = is->video_st->time_base;
-    int64_t amc_pts = av_rescale_q(buffer_info->presentationTimeUs, AV_TIME_BASE_Q, is->video_st->time_base);
+static double pts_from_buffer_info(IJKFF_Pipenode *node, SDL_AMediaCodecBufferInfo *buffer_info) {
+    IJKFF_Pipenode_Opaque *opaque = node->opaque;
+    FFPlayer *ffp = opaque->ffp;
+    VideoState *is = ffp->is;
+    AVRational tb = is->video_st->time_base;
+    int64_t amc_pts = av_rescale_q(buffer_info->presentationTimeUs, AV_TIME_BASE_Q,
+                                   is->video_st->time_base);
     double pts = amc_pts < 0 ? NAN : amc_pts * av_q2d(tb);
 
     return pts;
@@ -1076,13 +1117,14 @@ static void sort_amc_buf_out(AMC_Buf_Out *buf_out, int size) {
     }
 }
 
-static int drain_output_buffer_l(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, int *dequeue_count, AVFrame *frame, int *got_frame)
-{
-    IJKFF_Pipenode_Opaque *opaque   = node->opaque;
-    FFPlayer              *ffp      = opaque->ffp;
-    int                    ret      = 0;
+static int
+drain_output_buffer_l(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, int *dequeue_count,
+                      AVFrame *frame, int *got_frame) {
+    IJKFF_Pipenode_Opaque *opaque = node->opaque;
+    FFPlayer *ffp = opaque->ffp;
+    int ret = 0;
     SDL_AMediaCodecBufferInfo bufferInfo;
-    ssize_t                   output_buffer_index = 0;
+    ssize_t output_buffer_index = 0;
 
     if (dequeue_count)
         *dequeue_count = 0;
@@ -1092,7 +1134,8 @@ static int drain_output_buffer_l(JNIEnv *env, IJKFF_Pipenode *node, int64_t time
         goto fail;
     }
 
-    output_buffer_index = SDL_AMediaCodecFake_dequeueOutputBuffer(opaque->acodec, &bufferInfo, timeUs);
+    output_buffer_index = SDL_AMediaCodecFake_dequeueOutputBuffer(opaque->acodec, &bufferInfo,
+                                                                  timeUs);
     if (output_buffer_index == AMEDIACODEC__INFO_OUTPUT_BUFFERS_CHANGED) {
         ALOGI("AMEDIACODEC__INFO_OUTPUT_BUFFERS_CHANGED\n");
         // continue;
@@ -1101,44 +1144,43 @@ static int drain_output_buffer_l(JNIEnv *env, IJKFF_Pipenode *node, int64_t time
         SDL_AMediaFormat_deleteP(&opaque->output_aformat);
         opaque->output_aformat = SDL_AMediaCodec_getOutputFormat(opaque->acodec);
         if (opaque->output_aformat) {
-            int width        = 0;
-            int height       = 0;
+            int width = 0;
+            int height = 0;
             int color_format = 0;
-            int stride       = 0;
+            int stride = 0;
             int slice_height = 0;
-            int crop_left    = 0;
-            int crop_top     = 0;
-            int crop_right   = 0;
-            int crop_bottom  = 0;
+            int crop_left = 0;
+            int crop_top = 0;
+            int crop_right = 0;
+            int crop_bottom = 0;
 
-            SDL_AMediaFormat_getInt32(opaque->output_aformat, "width",          &width);
-            SDL_AMediaFormat_getInt32(opaque->output_aformat, "height",         &height);
-            SDL_AMediaFormat_getInt32(opaque->output_aformat, "color-format",   &color_format);
+            SDL_AMediaFormat_getInt32(opaque->output_aformat, "width", &width);
+            SDL_AMediaFormat_getInt32(opaque->output_aformat, "height", &height);
+            SDL_AMediaFormat_getInt32(opaque->output_aformat, "color-format", &color_format);
 
-            SDL_AMediaFormat_getInt32(opaque->output_aformat, "stride",         &stride);
-            SDL_AMediaFormat_getInt32(opaque->output_aformat, "slice-height",   &slice_height);
-            SDL_AMediaFormat_getInt32(opaque->output_aformat, "crop-left",      &crop_left);
-            SDL_AMediaFormat_getInt32(opaque->output_aformat, "crop-top",       &crop_top);
-            SDL_AMediaFormat_getInt32(opaque->output_aformat, "crop-right",     &crop_right);
-            SDL_AMediaFormat_getInt32(opaque->output_aformat, "crop-bottom",    &crop_bottom);
+            SDL_AMediaFormat_getInt32(opaque->output_aformat, "stride", &stride);
+            SDL_AMediaFormat_getInt32(opaque->output_aformat, "slice-height", &slice_height);
+            SDL_AMediaFormat_getInt32(opaque->output_aformat, "crop-left", &crop_left);
+            SDL_AMediaFormat_getInt32(opaque->output_aformat, "crop-top", &crop_top);
+            SDL_AMediaFormat_getInt32(opaque->output_aformat, "crop-right", &crop_right);
+            SDL_AMediaFormat_getInt32(opaque->output_aformat, "crop-bottom", &crop_bottom);
 
             // TI decoder could crash after reconfigure
             // ffp_notify_msg3(ffp, FFP_MSG_VIDEO_SIZE_CHANGED, width, height);
             // opaque->frame_width  = width;
             // opaque->frame_height = height;
             ALOGI(
-                "AMEDIACODEC__INFO_OUTPUT_FORMAT_CHANGED\n"
-                "    width-height: (%d x %d)\n"
-                "    color-format: (%s: 0x%x)\n"
-                "    stride:       (%d)\n"
-                "    slice-height: (%d)\n"
-                "    crop:         (%d, %d, %d, %d)\n"
-                ,
-                width, height,
-                SDL_AMediaCodec_getColorFormatName(color_format), color_format,
-                stride,
-                slice_height,
-                crop_left, crop_top, crop_right, crop_bottom);
+                    "AMEDIACODEC__INFO_OUTPUT_FORMAT_CHANGED\n"
+                    "    width-height: (%d x %d)\n"
+                    "    color-format: (%s: 0x%x)\n"
+                    "    stride:       (%d)\n"
+                    "    slice-height: (%d)\n"
+                    "    crop:         (%d, %d, %d, %d)\n",
+                    width, height,
+                    SDL_AMediaCodec_getColorFormatName(color_format), color_format,
+                    stride,
+                    slice_height,
+                    crop_left, crop_top, crop_right, crop_bottom);
         }
         // continue;
     } else if (output_buffer_index == AMEDIACODEC__INFO_TRY_AGAIN_LATER) {
@@ -1151,7 +1193,8 @@ static int drain_output_buffer_l(JNIEnv *env, IJKFF_Pipenode *node, int64_t time
 
         goto done;
     } else if (output_buffer_index >= 0) {
-        ffp->stat.vdps = SDL_SpeedSamplerAdd(&opaque->sampler, FFP_SHOW_VDPS_MEDIACODEC, "vdps[MediaCodec]");
+        ffp->stat.vdps = SDL_SpeedSamplerAdd(&opaque->sampler, FFP_SHOW_VDPS_MEDIACODEC,
+                                             "vdps[MediaCodec]");
 
         if (dequeue_count)
             ++*dequeue_count;
@@ -1204,7 +1247,8 @@ static int drain_output_buffer_l(JNIEnv *env, IJKFF_Pipenode *node, int64_t time
                 buf_out = &opaque->amc_buf_out[opaque->off_buf_out - 1];
                 /* new picture is the most aged, send now */
                 if (pts < buf_out->pts) {
-                    ret = amc_fill_frame(node, frame, got_frame, output_buffer_index, SDL_AMediaCodec_getSerial(opaque->acodec), &bufferInfo);
+                    ret = amc_fill_frame(node, frame, got_frame, output_buffer_index,
+                                         SDL_AMediaCodec_getSerial(opaque->acodec), &bufferInfo);
                     opaque->last_queued_pts = pts;
                     // ALOGD("pts = %f", pts);
                 } else {
@@ -1214,7 +1258,8 @@ static int drain_output_buffer_l(JNIEnv *env, IJKFF_Pipenode *node, int64_t time
                     for (i = opaque->off_buf_out - 1; i >= 0; i--) {
                         buf_out = &opaque->amc_buf_out[i];
                         if (pts > buf_out->pts) {
-                            ret = amc_fill_frame(node, frame, got_frame, buf_out->port, buf_out->acodec_serial, &buf_out->info);
+                            ret = amc_fill_frame(node, frame, got_frame, buf_out->port,
+                                                 buf_out->acodec_serial, &buf_out->info);
                             opaque->last_queued_pts = buf_out->pts;
                             // ALOGD("pts = %f", buf_out->pts);
                             /* replace for sort later */
@@ -1230,32 +1275,35 @@ static int drain_output_buffer_l(JNIEnv *env, IJKFF_Pipenode *node, int64_t time
                     if (i < 0) {
                         // ALOGE("buffer too small, drop picture!");
                         if (!(bufferInfo.flags & AMEDIACODEC__BUFFER_FLAG_FAKE_FRAME)) {
-                            SDL_AMediaCodec_releaseOutputBuffer(opaque->acodec, output_buffer_index, false);
+                            SDL_AMediaCodec_releaseOutputBuffer(opaque->acodec, output_buffer_index,
+                                                                false);
                             goto done;
                         }
                     }
                 }
             }
         } else {
-            ret = amc_fill_frame(node, frame, got_frame, output_buffer_index, SDL_AMediaCodec_getSerial(opaque->acodec), &bufferInfo);
+            ret = amc_fill_frame(node, frame, got_frame, output_buffer_index,
+                                 SDL_AMediaCodec_getSerial(opaque->acodec), &bufferInfo);
         }
     }
 
-done:
+    done:
     if (opaque->decoder->queue->abort_request)
         ret = -1;
     else
         ret = 0;
-fail:
+    fail:
     return ret;
 }
 
-static int drain_output_buffer2_l(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, int *dequeue_count, AVFrame *frame, int *got_frame)
-{
-    IJKFF_Pipenode_Opaque *opaque         = node->opaque;
-    FFPlayer              *ffp            = opaque->ffp;
+static int
+drain_output_buffer2_l(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, int *dequeue_count,
+                       AVFrame *frame, int *got_frame) {
+    IJKFF_Pipenode_Opaque *opaque = node->opaque;
+    FFPlayer *ffp = opaque->ffp;
     SDL_AMediaCodecBufferInfo bufferInfo;
-    ssize_t          output_buffer_index  = 0;
+    ssize_t output_buffer_index = 0;
 
     if (dequeue_count)
         *dequeue_count = 0;
@@ -1265,7 +1313,8 @@ static int drain_output_buffer2_l(JNIEnv *env, IJKFF_Pipenode *node, int64_t tim
         return ACODEC_RETRY;
     }
 
-    output_buffer_index = SDL_AMediaCodecFake_dequeueOutputBuffer(opaque->acodec, &bufferInfo, timeUs);
+    output_buffer_index = SDL_AMediaCodecFake_dequeueOutputBuffer(opaque->acodec, &bufferInfo,
+                                                                  timeUs);
     if (output_buffer_index == AMEDIACODEC__INFO_OUTPUT_BUFFERS_CHANGED) {
         ALOGD("AMEDIACODEC__INFO_OUTPUT_BUFFERS_CHANGED\n");
         return ACODEC_RETRY;
@@ -1274,44 +1323,43 @@ static int drain_output_buffer2_l(JNIEnv *env, IJKFF_Pipenode *node, int64_t tim
         SDL_AMediaFormat_deleteP(&opaque->output_aformat);
         opaque->output_aformat = SDL_AMediaCodec_getOutputFormat(opaque->acodec);
         if (opaque->output_aformat) {
-            int width        = 0;
-            int height       = 0;
+            int width = 0;
+            int height = 0;
             int color_format = 0;
-            int stride       = 0;
+            int stride = 0;
             int slice_height = 0;
-            int crop_left    = 0;
-            int crop_top     = 0;
-            int crop_right   = 0;
-            int crop_bottom  = 0;
+            int crop_left = 0;
+            int crop_top = 0;
+            int crop_right = 0;
+            int crop_bottom = 0;
 
-            SDL_AMediaFormat_getInt32(opaque->output_aformat, "width",          &width);
-            SDL_AMediaFormat_getInt32(opaque->output_aformat, "height",         &height);
-            SDL_AMediaFormat_getInt32(opaque->output_aformat, "color-format",   &color_format);
+            SDL_AMediaFormat_getInt32(opaque->output_aformat, "width", &width);
+            SDL_AMediaFormat_getInt32(opaque->output_aformat, "height", &height);
+            SDL_AMediaFormat_getInt32(opaque->output_aformat, "color-format", &color_format);
 
-            SDL_AMediaFormat_getInt32(opaque->output_aformat, "stride",         &stride);
-            SDL_AMediaFormat_getInt32(opaque->output_aformat, "slice-height",   &slice_height);
-            SDL_AMediaFormat_getInt32(opaque->output_aformat, "crop-left",      &crop_left);
-            SDL_AMediaFormat_getInt32(opaque->output_aformat, "crop-top",       &crop_top);
-            SDL_AMediaFormat_getInt32(opaque->output_aformat, "crop-right",     &crop_right);
-            SDL_AMediaFormat_getInt32(opaque->output_aformat, "crop-bottom",    &crop_bottom);
+            SDL_AMediaFormat_getInt32(opaque->output_aformat, "stride", &stride);
+            SDL_AMediaFormat_getInt32(opaque->output_aformat, "slice-height", &slice_height);
+            SDL_AMediaFormat_getInt32(opaque->output_aformat, "crop-left", &crop_left);
+            SDL_AMediaFormat_getInt32(opaque->output_aformat, "crop-top", &crop_top);
+            SDL_AMediaFormat_getInt32(opaque->output_aformat, "crop-right", &crop_right);
+            SDL_AMediaFormat_getInt32(opaque->output_aformat, "crop-bottom", &crop_bottom);
 
             // TI decoder could crash after reconfigure
             // ffp_notify_msg3(ffp, FFP_MSG_VIDEO_SIZE_CHANGED, width, height);
             // opaque->frame_width  = width;
             // opaque->frame_height = height;
             ALOGI(
-                "AMEDIACODEC__INFO_OUTPUT_FORMAT_CHANGED\n"
-                "    width-height: (%d x %d)\n"
-                "    color-format: (%s: 0x%x)\n"
-                "    stride:       (%d)\n"
-                "    slice-height: (%d)\n"
-                "    crop:         (%d, %d, %d, %d)\n"
-                ,
-                width, height,
-                SDL_AMediaCodec_getColorFormatName(color_format), color_format,
-                stride,
-                slice_height,
-                crop_left, crop_top, crop_right, crop_bottom);
+                    "AMEDIACODEC__INFO_OUTPUT_FORMAT_CHANGED\n"
+                    "    width-height: (%d x %d)\n"
+                    "    color-format: (%s: 0x%x)\n"
+                    "    stride:       (%d)\n"
+                    "    slice-height: (%d)\n"
+                    "    crop:         (%d, %d, %d, %d)\n",
+                    width, height,
+                    SDL_AMediaCodec_getColorFormatName(color_format), color_format,
+                    stride,
+                    slice_height,
+                    crop_left, crop_top, crop_right, crop_bottom);
         }
         return ACODEC_RETRY;
         // continue;
@@ -1321,7 +1369,8 @@ static int drain_output_buffer2_l(JNIEnv *env, IJKFF_Pipenode *node, int64_t tim
     } else if (output_buffer_index < 0) {
         return 0;
     } else if (output_buffer_index >= 0) {
-        ffp->stat.vdps = SDL_SpeedSamplerAdd(&opaque->sampler, FFP_SHOW_VDPS_MEDIACODEC, "vdps[MediaCodec]");
+        ffp->stat.vdps = SDL_SpeedSamplerAdd(&opaque->sampler, FFP_SHOW_VDPS_MEDIACODEC,
+                                             "vdps[MediaCodec]");
 
         if (dequeue_count)
             ++*dequeue_count;
@@ -1351,7 +1400,8 @@ static int drain_output_buffer2_l(JNIEnv *env, IJKFF_Pipenode *node, int64_t tim
                 buf_out = &opaque->amc_buf_out[opaque->off_buf_out - 1];
                 /* new picture is the most aged, send now */
                 if (pts < buf_out->pts) {
-                    amc_fill_frame(node, frame, got_frame, output_buffer_index, SDL_AMediaCodec_getSerial(opaque->acodec), &bufferInfo);
+                    amc_fill_frame(node, frame, got_frame, output_buffer_index,
+                                   SDL_AMediaCodec_getSerial(opaque->acodec), &bufferInfo);
                     opaque->last_queued_pts = pts;
                     // ALOGD("pts = %f", pts);
                 } else {
@@ -1361,7 +1411,8 @@ static int drain_output_buffer2_l(JNIEnv *env, IJKFF_Pipenode *node, int64_t tim
                     for (i = opaque->off_buf_out - 1; i >= 0; i--) {
                         buf_out = &opaque->amc_buf_out[i];
                         if (pts > buf_out->pts) {
-                            amc_fill_frame(node, frame, got_frame, buf_out->port, buf_out->acodec_serial, &buf_out->info);
+                            amc_fill_frame(node, frame, got_frame, buf_out->port,
+                                           buf_out->acodec_serial, &buf_out->info);
                             opaque->last_queued_pts = buf_out->pts;
                             // ALOGD("pts = %f", buf_out->pts);
                             /* replace for sort later */
@@ -1377,22 +1428,25 @@ static int drain_output_buffer2_l(JNIEnv *env, IJKFF_Pipenode *node, int64_t tim
                     if (i < 0) {
                         // ALOGE("buffer too small, drop picture!");
                         if (!(bufferInfo.flags & AMEDIACODEC__BUFFER_FLAG_FAKE_FRAME)) {
-                            SDL_AMediaCodec_releaseOutputBuffer(opaque->acodec, output_buffer_index, false);
+                            SDL_AMediaCodec_releaseOutputBuffer(opaque->acodec, output_buffer_index,
+                                                                false);
                             return 0;
                         }
                     }
                 }
             }
         } else {
-            amc_fill_frame(node, frame, got_frame, output_buffer_index, SDL_AMediaCodec_getSerial(opaque->acodec), &bufferInfo);
+            amc_fill_frame(node, frame, got_frame, output_buffer_index,
+                           SDL_AMediaCodec_getSerial(opaque->acodec), &bufferInfo);
         }
     }
 
     return 0;
 }
 
-static int drain_output_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, int *dequeue_count, AVFrame *frame, int *got_frame)
-{
+static int
+drain_output_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, int *dequeue_count,
+                    AVFrame *frame, int *got_frame) {
     IJKFF_Pipenode_Opaque *opaque = node->opaque;
     SDL_LockMutex(opaque->acodec_mutex);
 
@@ -1407,8 +1461,7 @@ static int drain_output_buffer(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs
     return ret;
 }
 
-static void func_destroy(IJKFF_Pipenode *node)
-{
+static void func_destroy(IJKFF_Pipenode *node) {
     if (!node || !node->opaque)
         return;
 
@@ -1444,37 +1497,44 @@ static void func_destroy(IJKFF_Pipenode *node)
     }
 }
 
-static int drain_output_buffer2(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, int *dequeue_count, AVFrame *frame, AVRational frame_rate)
-{
-    IJKFF_Pipenode_Opaque *opaque    = node->opaque;
-    FFPlayer              *ffp       = opaque->ffp;
-    VideoState            *is        = ffp->is;
-    AVRational            tb         = is->video_st->time_base;
-    int                   got_frame  = 0;
-    int                   ret        = -1;
-    double                duration;
-    double                pts;
+static int
+drain_output_buffer2(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeUs, int *dequeue_count,
+                     AVFrame *frame, AVRational frame_rate) {
+    IJKFF_Pipenode_Opaque *opaque = node->opaque;
+    FFPlayer *ffp = opaque->ffp;
+    VideoState *is = ffp->is;
+    AVRational tb = is->video_st->time_base;
+    int got_frame = 0;
+    int ret = -1;
+    double duration;
+    double pts;
     while (ret) {
         got_frame = 0;
         ret = drain_output_buffer2_l(env, node, timeUs, dequeue_count, frame, &got_frame);
 
         if (opaque->decoder->queue->abort_request) {
             if (got_frame && frame->opaque)
-                SDL_VoutAndroid_releaseBufferProxyP(opaque->weak_vout, (SDL_AMediaCodecBufferProxy **)&frame->opaque, false);
+                SDL_VoutAndroid_releaseBufferProxyP(opaque->weak_vout,
+                                                    (SDL_AMediaCodecBufferProxy **) &frame->opaque,
+                                                    false);
 
             return ACODEC_EXIT;
         }
 
         if (ret != 0) {
             if (got_frame && frame->opaque)
-                SDL_VoutAndroid_releaseBufferProxyP(opaque->weak_vout, (SDL_AMediaCodecBufferProxy **)&frame->opaque, false);
+                SDL_VoutAndroid_releaseBufferProxyP(opaque->weak_vout,
+                                                    (SDL_AMediaCodecBufferProxy **) &frame->opaque,
+                                                    false);
         }
     }
 
     if (got_frame) {
-        duration = (frame_rate.num && frame_rate.den ? av_q2d((AVRational){frame_rate.den, frame_rate.num}) : 0);
+        duration = (frame_rate.num && frame_rate.den ? av_q2d(
+                (AVRational) {frame_rate.den, frame_rate.num}) : 0);
         pts = (frame->pts == AV_NOPTS_VALUE) ? NAN : frame->pts * av_q2d(tb);
-        if (ffp->framedrop > 0 || (ffp->framedrop && ffp_get_master_sync_type(is) != AV_SYNC_VIDEO_MASTER)) {
+        if (ffp->framedrop > 0 ||
+            (ffp->framedrop && ffp_get_master_sync_type(is) != AV_SYNC_VIDEO_MASTER)) {
             ffp->stat.decode_frame_count++;
             if (frame->pts != AV_NOPTS_VALUE) {
                 double dpts = pts;
@@ -1489,9 +1549,12 @@ static int drain_output_buffer2(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeU
                         is->continuous_frame_drops_early = 0;
                     } else {
                         ffp->stat.drop_frame_count++;
-                        ffp->stat.drop_frame_rate = (float)(ffp->stat.drop_frame_count) / (float)(ffp->stat.decode_frame_count);
+                        ffp->stat.drop_frame_rate = (float) (ffp->stat.drop_frame_count) /
+                                                    (float) (ffp->stat.decode_frame_count);
                         if (frame->opaque) {
-                            SDL_VoutAndroid_releaseBufferProxyP(opaque->weak_vout, (SDL_AMediaCodecBufferProxy **)&frame->opaque, false);
+                            SDL_VoutAndroid_releaseBufferProxyP(opaque->weak_vout,
+                                                                (SDL_AMediaCodecBufferProxy **) &frame->opaque,
+                                                                false);
                         }
                         av_frame_unref(frame);
                         return ret;
@@ -1499,10 +1562,13 @@ static int drain_output_buffer2(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeU
                 }
             }
         }
-        ret = ffp_queue_picture(ffp, frame, pts, duration, av_frame_get_pkt_pos(frame), is->viddec.pkt_serial);
+        ret = ffp_queue_picture(ffp, frame, pts, duration, frame->pkt_pos,
+                                is->viddec.pkt_serial);
         if (ret) {
             if (frame->opaque)
-                SDL_VoutAndroid_releaseBufferProxyP(opaque->weak_vout, (SDL_AMediaCodecBufferProxy **)&frame->opaque, false);
+                SDL_VoutAndroid_releaseBufferProxyP(opaque->weak_vout,
+                                                    (SDL_AMediaCodecBufferProxy **) &frame->opaque,
+                                                    false);
         }
         av_frame_unref(frame);
     }
@@ -1511,17 +1577,17 @@ static int drain_output_buffer2(JNIEnv *env, IJKFF_Pipenode *node, int64_t timeU
 }
 
 static int func_run_sync_loop(IJKFF_Pipenode *node) {
-    JNIEnv                *env           = NULL;
-    IJKFF_Pipenode_Opaque *opaque        = node->opaque;
-    FFPlayer              *ffp           = opaque->ffp;
-    VideoState            *is            = ffp->is;
-    Decoder               *d             = &is->viddec;
-    PacketQueue           *q             = d->queue;
-    int                    ret           = 0;
-    int                    dequeue_count = 0;
-    int                    enqueue_count = 0;
-    AVFrame               *frame         = NULL;
-    AVRational             frame_rate    = av_guess_frame_rate(is->ic, is->video_st, NULL);
+    JNIEnv *env = NULL;
+    IJKFF_Pipenode_Opaque *opaque = node->opaque;
+    FFPlayer *ffp = opaque->ffp;
+    VideoState *is = ffp->is;
+    Decoder *d = &is->viddec;
+    PacketQueue *q = d->queue;
+    int ret = 0;
+    int dequeue_count = 0;
+    int enqueue_count = 0;
+    AVFrame *frame = NULL;
+    AVRational frame_rate = av_guess_frame_rate(is->ic, is->video_st, NULL);
     if (!opaque->acodec) {
         return ffp_video_thread(ffp);
     }
@@ -1536,11 +1602,12 @@ static int func_run_sync_loop(IJKFF_Pipenode *node) {
         goto fail;
 
     while (!q->abort_request) {
-        ret = drain_output_buffer2(env, node, AMC_SYNC_OUTPUT_TIMEOUT_US, &dequeue_count, frame, frame_rate);
+        ret = drain_output_buffer2(env, node, AMC_SYNC_OUTPUT_TIMEOUT_US, &dequeue_count, frame,
+                                   frame_rate);
         ret = feed_input_buffer2(env, node, AMC_SYNC_INPUT_TIMEOUT_US, &enqueue_count);
     }
 
-fail:
+    fail:
     av_frame_free(&frame);
     opaque->abort = true;
     if (opaque->n_buf_out) {
@@ -1559,22 +1626,21 @@ fail:
     return ret;
 }
 
-static int func_run_sync(IJKFF_Pipenode *node)
-{
-    JNIEnv                *env      = NULL;
-    IJKFF_Pipenode_Opaque *opaque   = node->opaque;
-    FFPlayer              *ffp      = opaque->ffp;
-    VideoState            *is       = ffp->is;
-    Decoder               *d        = &is->viddec;
-    PacketQueue           *q        = d->queue;
-    int                    ret      = 0;
-    int                    dequeue_count = 0;
-    AVFrame               *frame    = NULL;
-    int                    got_frame = 0;
-    AVRational             tb         = is->video_st->time_base;
-    AVRational             frame_rate = av_guess_frame_rate(is->ic, is->video_st, NULL);
-    double                 duration;
-    double                 pts;
+static int func_run_sync(IJKFF_Pipenode *node) {
+    JNIEnv *env = NULL;
+    IJKFF_Pipenode_Opaque *opaque = node->opaque;
+    FFPlayer *ffp = opaque->ffp;
+    VideoState *is = ffp->is;
+    Decoder *d = &is->viddec;
+    PacketQueue *q = d->queue;
+    int ret = 0;
+    int dequeue_count = 0;
+    AVFrame *frame = NULL;
+    int got_frame = 0;
+    AVRational tb = is->video_st->time_base;
+    AVRational frame_rate = av_guess_frame_rate(is->ic, is->video_st, NULL);
+    double duration;
+    double pts;
 
     if (!opaque->acodec) {
         return ffp_video_thread(ffp);
@@ -1589,7 +1655,8 @@ static int func_run_sync(IJKFF_Pipenode *node)
     if (!frame)
         goto fail;
 
-    opaque->enqueue_thread = SDL_CreateThreadEx(&opaque->_enqueue_thread, enqueue_thread_func, node, "amediacodec_input_thread");
+    opaque->enqueue_thread = SDL_CreateThreadEx(&opaque->_enqueue_thread, enqueue_thread_func, node,
+                                                "amediacodec_input_thread");
     if (!opaque->enqueue_thread) {
         ALOGE("%s: SDL_CreateThreadEx failed\n", __func__);
         ret = -1;
@@ -1609,13 +1676,17 @@ static int func_run_sync(IJKFF_Pipenode *node)
         if (ret != 0) {
             ret = -1;
             if (got_frame && frame->opaque)
-                SDL_VoutAndroid_releaseBufferProxyP(opaque->weak_vout, (SDL_AMediaCodecBufferProxy **)&frame->opaque, false);
+                SDL_VoutAndroid_releaseBufferProxyP(opaque->weak_vout,
+                                                    (SDL_AMediaCodecBufferProxy **) &frame->opaque,
+                                                    false);
             goto fail;
         }
         if (got_frame) {
-            duration = (frame_rate.num && frame_rate.den ? av_q2d((AVRational){frame_rate.den, frame_rate.num}) : 0);
+            duration = (frame_rate.num && frame_rate.den ? av_q2d(
+                    (AVRational) {frame_rate.den, frame_rate.num}) : 0);
             pts = (frame->pts == AV_NOPTS_VALUE) ? NAN : frame->pts * av_q2d(tb);
-            if (ffp->framedrop > 0 || (ffp->framedrop && ffp_get_master_sync_type(is) != AV_SYNC_VIDEO_MASTER)) {
+            if (ffp->framedrop > 0 ||
+                (ffp->framedrop && ffp_get_master_sync_type(is) != AV_SYNC_VIDEO_MASTER)) {
                 ffp->stat.decode_frame_count++;
                 if (frame->pts != AV_NOPTS_VALUE) {
                     double dpts = pts;
@@ -1630,9 +1701,12 @@ static int func_run_sync(IJKFF_Pipenode *node)
                             is->continuous_frame_drops_early = 0;
                         } else {
                             ffp->stat.drop_frame_count++;
-                            ffp->stat.drop_frame_rate = (float)(ffp->stat.drop_frame_count) / (float)(ffp->stat.decode_frame_count);
+                            ffp->stat.drop_frame_rate = (float) (ffp->stat.drop_frame_count) /
+                                                        (float) (ffp->stat.decode_frame_count);
                             if (frame->opaque) {
-                                SDL_VoutAndroid_releaseBufferProxyP(opaque->weak_vout, (SDL_AMediaCodecBufferProxy **)&frame->opaque, false);
+                                SDL_VoutAndroid_releaseBufferProxyP(opaque->weak_vout,
+                                                                    (SDL_AMediaCodecBufferProxy **) &frame->opaque,
+                                                                    false);
                             }
                             av_frame_unref(frame);
                             continue;
@@ -1640,16 +1714,18 @@ static int func_run_sync(IJKFF_Pipenode *node)
                     }
                 }
             }
-            ret = ffp_queue_picture(ffp, frame, pts, duration, av_frame_get_pkt_pos(frame), is->viddec.pkt_serial);
+            ret = ffp_queue_picture(ffp, frame, pts, duration, frame->pkt_pos,
+                                    is->viddec.pkt_serial);
             if (ret) {
                 if (frame->opaque)
-                    SDL_VoutAndroid_releaseBufferProxyP(opaque->weak_vout, (SDL_AMediaCodecBufferProxy **)&frame->opaque, false);
+                    SDL_VoutAndroid_releaseBufferProxyP(opaque->weak_vout,
+                                                        (SDL_AMediaCodecBufferProxy **) &frame->opaque,
+                                                        false);
             }
             av_frame_unref(frame);
         }
     }
-
-fail:
+    fail:
     av_frame_free(&frame);
     opaque->abort = true;
     SDL_WaitThread(opaque->enqueue_thread, NULL);
@@ -1671,15 +1747,14 @@ fail:
     ALOGI("MediaCodec: %s: exit: %d", __func__, ret);
     return ret;
 #if 0
-fallback_to_ffplay:
-    ALOGW("fallback to ffplay decoder\n");
-    return ffp_video_thread(opaque->ffp);
+    fallback_to_ffplay:
+        ALOGW("fallback to ffplay decoder\n");
+        return ffp_video_thread(opaque->ffp);
 #endif
 }
 
-static int func_flush(IJKFF_Pipenode *node)
-{
-    IJKFF_Pipenode_Opaque *opaque   = node->opaque;
+static int func_flush(IJKFF_Pipenode *node) {
+    IJKFF_Pipenode_Opaque *opaque = node->opaque;
 
     if (!opaque)
         return -1;
@@ -1689,13 +1764,15 @@ static int func_flush(IJKFF_Pipenode *node)
     return 0;
 }
 
-int ffpipenode_config_from_android_mediacodec(FFPlayer *ffp, IJKFF_Pipeline *pipeline, SDL_Vout *vout, IJKFF_Pipenode *node) {
-    int                   ret     = 0;
-    VideoState            *is     = ffp->is;
+int
+ffpipenode_config_from_android_mediacodec(FFPlayer *ffp, IJKFF_Pipeline *pipeline, SDL_Vout *vout,
+                                          IJKFF_Pipenode *node) {
+    int ret = 0;
+    VideoState *is = ffp->is;
     IJKFF_Pipenode_Opaque *opaque = node->opaque;
-    JNIEnv                *env    = NULL;
-    jobject              jsurface = NULL;
-    opaque->decoder               = &is->viddec;
+    JNIEnv *env = NULL;
+    jobject jsurface = NULL;
+    opaque->decoder = &is->viddec;
 
     if (JNI_OK != SDL_JNI_SetupThreadEnv(&env)) {
         ALOGE("%s:create: SetupThreadEnv failed\n", __func__);
@@ -1707,94 +1784,100 @@ int ffpipenode_config_from_android_mediacodec(FFPlayer *ffp, IJKFF_Pipeline *pip
         goto fail;
 
     switch (opaque->codecpar->codec_id) {
-    case AV_CODEC_ID_H264:
-        if (!ffp->mediacodec_avc && !ffp->mediacodec_all_videos) {
-            ALOGE("%s: MediaCodec: AVC/H264 is disabled. codec_id:%d \n", __func__, opaque->codecpar->codec_id);
-            goto fail;
-        }
-        switch (opaque->codecpar->profile) {
-            case FF_PROFILE_H264_BASELINE:
-                ALOGI("%s: MediaCodec: H264_BASELINE: enabled\n", __func__);
-                break;
-            case FF_PROFILE_H264_CONSTRAINED_BASELINE:
-                ALOGI("%s: MediaCodec: H264_CONSTRAINED_BASELINE: enabled\n", __func__);
-                break;
-            case FF_PROFILE_H264_MAIN:
-                ALOGI("%s: MediaCodec: H264_MAIN: enabled\n", __func__);
-                break;
-            case FF_PROFILE_H264_EXTENDED:
-                ALOGI("%s: MediaCodec: H264_EXTENDED: enabled\n", __func__);
-                break;
-            case FF_PROFILE_H264_HIGH:
-                ALOGI("%s: MediaCodec: H264_HIGH: enabled\n", __func__);
-                break;
-            case FF_PROFILE_H264_HIGH_10:
-                ALOGW("%s: MediaCodec: H264_HIGH_10: disabled\n", __func__);
+        case AV_CODEC_ID_H264:
+            if (!ffp->mediacodec_avc && !ffp->mediacodec_all_videos) {
+                ALOGE("%s: MediaCodec: AVC/H264 is disabled. codec_id:%d \n", __func__,
+                      opaque->codecpar->codec_id);
                 goto fail;
-            case FF_PROFILE_H264_HIGH_10_INTRA:
-                ALOGW("%s: MediaCodec: H264_HIGH_10_INTRA: disabled\n", __func__);
+            }
+            switch (opaque->codecpar->profile) {
+                case FF_PROFILE_H264_BASELINE:
+                    ALOGI("%s: MediaCodec: H264_BASELINE: enabled\n", __func__);
+                    break;
+                case FF_PROFILE_H264_CONSTRAINED_BASELINE:
+                    ALOGI("%s: MediaCodec: H264_CONSTRAINED_BASELINE: enabled\n", __func__);
+                    break;
+                case FF_PROFILE_H264_MAIN:
+                    ALOGI("%s: MediaCodec: H264_MAIN: enabled\n", __func__);
+                    break;
+                case FF_PROFILE_H264_EXTENDED:
+                    ALOGI("%s: MediaCodec: H264_EXTENDED: enabled\n", __func__);
+                    break;
+                case FF_PROFILE_H264_HIGH:
+                    ALOGI("%s: MediaCodec: H264_HIGH: enabled\n", __func__);
+                    break;
+                case FF_PROFILE_H264_HIGH_10:
+                    ALOGW("%s: MediaCodec: H264_HIGH_10: disabled\n", __func__);
+                    goto fail;
+                case FF_PROFILE_H264_HIGH_10_INTRA:
+                    ALOGW("%s: MediaCodec: H264_HIGH_10_INTRA: disabled\n", __func__);
+                    goto fail;
+                case FF_PROFILE_H264_HIGH_422:
+                    ALOGW("%s: MediaCodec: H264_HIGH_10_422: disabled\n", __func__);
+                    goto fail;
+                case FF_PROFILE_H264_HIGH_422_INTRA:
+                    ALOGW("%s: MediaCodec: H264_HIGH_10_INTRA: disabled\n", __func__);
+                    goto fail;
+                case FF_PROFILE_H264_HIGH_444:
+                    ALOGW("%s: MediaCodec: H264_HIGH_10_444: disabled\n", __func__);
+                    goto fail;
+                case FF_PROFILE_H264_HIGH_444_PREDICTIVE:
+                    ALOGW("%s: MediaCodec: H264_HIGH_444_PREDICTIVE: disabled\n", __func__);
+                    goto fail;
+                case FF_PROFILE_H264_HIGH_444_INTRA:
+                    ALOGW("%s: MediaCodec: H264_HIGH_444_INTRA: disabled\n", __func__);
+                    goto fail;
+                case FF_PROFILE_H264_CAVLC_444:
+                    ALOGW("%s: MediaCodec: H264_CAVLC_444: disabled\n", __func__);
+                    goto fail;
+                default:
+                    ALOGW("%s: MediaCodec: (%d) unknown profile: disabled\n", __func__,
+                          opaque->codecpar->profile);
+                    goto fail;
+            }
+            strcpy(opaque->mcc.mime_type, SDL_AMIME_VIDEO_AVC);
+            opaque->mcc.profile = opaque->codecpar->profile;
+            opaque->mcc.level = opaque->codecpar->level;
+            break;
+        case AV_CODEC_ID_HEVC:
+            if (!ffp->mediacodec_hevc && !ffp->mediacodec_all_videos) {
+                ALOGE("%s: MediaCodec/HEVC is disabled. codec_id:%d \n", __func__,
+                      opaque->codecpar->codec_id);
                 goto fail;
-            case FF_PROFILE_H264_HIGH_422:
-                ALOGW("%s: MediaCodec: H264_HIGH_10_422: disabled\n", __func__);
+            }
+            strcpy(opaque->mcc.mime_type, SDL_AMIME_VIDEO_HEVC);
+            opaque->mcc.profile = opaque->codecpar->profile;
+            opaque->mcc.level = opaque->codecpar->level;
+            break;
+        case AV_CODEC_ID_MPEG2VIDEO:
+            if (!ffp->mediacodec_mpeg2 && !ffp->mediacodec_all_videos) {
+                ALOGE("%s: MediaCodec/MPEG2VIDEO is disabled. codec_id:%d \n", __func__,
+                      opaque->codecpar->codec_id);
                 goto fail;
-            case FF_PROFILE_H264_HIGH_422_INTRA:
-                ALOGW("%s: MediaCodec: H264_HIGH_10_INTRA: disabled\n", __func__);
+            }
+            strcpy(opaque->mcc.mime_type, SDL_AMIME_VIDEO_MPEG2VIDEO);
+            opaque->mcc.profile = opaque->codecpar->profile;
+            opaque->mcc.level = opaque->codecpar->level;
+            break;
+        case AV_CODEC_ID_MPEG4:
+            if (!ffp->mediacodec_mpeg4 && !ffp->mediacodec_all_videos) {
+                ALOGE("%s: MediaCodec/MPEG4 is disabled. codec_id:%d \n", __func__,
+                      opaque->codecpar->codec_id);
                 goto fail;
-            case FF_PROFILE_H264_HIGH_444:
-                ALOGW("%s: MediaCodec: H264_HIGH_10_444: disabled\n", __func__);
+            }
+            if ((opaque->codecpar->codec_tag & 0x0000FFFF) == 0x00005844) {
+                ALOGE("%s: divx is not supported \n", __func__);
                 goto fail;
-            case FF_PROFILE_H264_HIGH_444_PREDICTIVE:
-                ALOGW("%s: MediaCodec: H264_HIGH_444_PREDICTIVE: disabled\n", __func__);
-                goto fail;
-            case FF_PROFILE_H264_HIGH_444_INTRA:
-                ALOGW("%s: MediaCodec: H264_HIGH_444_INTRA: disabled\n", __func__);
-                goto fail;
-            case FF_PROFILE_H264_CAVLC_444:
-                ALOGW("%s: MediaCodec: H264_CAVLC_444: disabled\n", __func__);
-                goto fail;
-            default:
-                ALOGW("%s: MediaCodec: (%d) unknown profile: disabled\n", __func__, opaque->codecpar->profile);
-                goto fail;
-        }
-        strcpy(opaque->mcc.mime_type, SDL_AMIME_VIDEO_AVC);
-        opaque->mcc.profile = opaque->codecpar->profile;
-        opaque->mcc.level   = opaque->codecpar->level;
-        break;
-    case AV_CODEC_ID_HEVC:
-        if (!ffp->mediacodec_hevc && !ffp->mediacodec_all_videos) {
-            ALOGE("%s: MediaCodec/HEVC is disabled. codec_id:%d \n", __func__, opaque->codecpar->codec_id);
-            goto fail;
-        }
-        strcpy(opaque->mcc.mime_type, SDL_AMIME_VIDEO_HEVC);
-        opaque->mcc.profile = opaque->codecpar->profile;
-        opaque->mcc.level   = opaque->codecpar->level;
-        break;
-    case AV_CODEC_ID_MPEG2VIDEO:
-        if (!ffp->mediacodec_mpeg2 && !ffp->mediacodec_all_videos) {
-            ALOGE("%s: MediaCodec/MPEG2VIDEO is disabled. codec_id:%d \n", __func__, opaque->codecpar->codec_id);
-            goto fail;
-        }
-        strcpy(opaque->mcc.mime_type, SDL_AMIME_VIDEO_MPEG2VIDEO);
-        opaque->mcc.profile = opaque->codecpar->profile;
-        opaque->mcc.level   = opaque->codecpar->level;
-        break;
-    case AV_CODEC_ID_MPEG4:
-        if (!ffp->mediacodec_mpeg4 && !ffp->mediacodec_all_videos) {
-            ALOGE("%s: MediaCodec/MPEG4 is disabled. codec_id:%d \n", __func__, opaque->codecpar->codec_id);
-            goto fail;
-        }
-        if ((opaque->codecpar->codec_tag & 0x0000FFFF) == 0x00005844) {
-            ALOGE("%s: divx is not supported \n", __func__);
-            goto fail;
-        }
-        strcpy(opaque->mcc.mime_type, SDL_AMIME_VIDEO_MPEG4);
-        opaque->mcc.profile = opaque->codecpar->profile >= 0 ? opaque->codecpar->profile : 0;
-        opaque->mcc.level   = opaque->codecpar->level >= 0 ? opaque->codecpar->level : 1;
-        break;
+            }
+            strcpy(opaque->mcc.mime_type, SDL_AMIME_VIDEO_MPEG4);
+            opaque->mcc.profile = opaque->codecpar->profile >= 0 ? opaque->codecpar->profile : 0;
+            opaque->mcc.level = opaque->codecpar->level >= 0 ? opaque->codecpar->level : 1;
+            break;
 
-    default:
-        ALOGE("%s:create: not H264 or H265/HEVC, codec_id:%d \n", __func__, opaque->codecpar->codec_id);
-        goto fail;
+        default:
+            ALOGE("%s:create: not H264 or H265/HEVC, codec_id:%d \n", __func__,
+                  opaque->codecpar->codec_id);
+            goto fail;
     }
 
     if (strcmp(opaque->mcc.mime_type, ffp->video_mime_type)) {
@@ -1831,14 +1914,15 @@ int ffpipenode_config_from_android_mediacodec(FFPlayer *ffp, IJKFF_Pipeline *pip
 
     return 0;
 
-fail:
+    fail:
     ret = -1;
     ffpipenode_free_p(&node);
     return ret;
 }
 
-IJKFF_Pipenode *ffpipenode_init_decoder_from_android_mediacodec(FFPlayer *ffp, IJKFF_Pipeline *pipeline, SDL_Vout *vout)
-{
+IJKFF_Pipenode *
+ffpipenode_init_decoder_from_android_mediacodec(FFPlayer *ffp, IJKFF_Pipeline *pipeline,
+                                                SDL_Vout *vout) {
     if (SDL_Android_GetApiLevel() < IJK_API_16_JELLY_BEAN)
         return NULL;
 
@@ -1849,30 +1933,31 @@ IJKFF_Pipenode *ffpipenode_init_decoder_from_android_mediacodec(FFPlayer *ffp, I
     if (!node)
         return node;
 
-    VideoState            *is     = ffp->is;
+    VideoState *is = ffp->is;
     IJKFF_Pipenode_Opaque *opaque = node->opaque;
-    JNIEnv                *env    = NULL;
+    JNIEnv *env = NULL;
 
-    node->func_destroy  = func_destroy;
+    node->func_destroy = func_destroy;
     if (ffp->mediacodec_sync) {
         node->func_run_sync = func_run_sync_loop;
     } else {
         node->func_run_sync = func_run_sync;
     }
-    node->func_flush    = func_flush;
-    opaque->pipeline    = pipeline;
-    opaque->ffp         = ffp;
-    opaque->decoder     = &is->viddec;
-    opaque->weak_vout   = vout;
+    node->func_flush = func_flush;
+    opaque->pipeline = pipeline;
+    opaque->ffp = ffp;
+    opaque->decoder = &is->viddec;
+    opaque->weak_vout = vout;
 
-    opaque->acodec_mutex                      = SDL_CreateMutex();
-    opaque->acodec_cond                       = SDL_CreateCond();
+    opaque->acodec_mutex = SDL_CreateMutex();
+    opaque->acodec_cond = SDL_CreateCond();
     opaque->acodec_first_dequeue_output_mutex = SDL_CreateMutex();
-    opaque->acodec_first_dequeue_output_cond  = SDL_CreateCond();
-    opaque->any_input_mutex                   = SDL_CreateMutex();
-    opaque->any_input_cond                    = SDL_CreateCond();
+    opaque->acodec_first_dequeue_output_cond = SDL_CreateCond();
+    opaque->any_input_mutex = SDL_CreateMutex();
+    opaque->any_input_cond = SDL_CreateCond();
 
-    if (!opaque->acodec_cond || !opaque->acodec_cond || !opaque->acodec_first_dequeue_output_mutex || !opaque->acodec_first_dequeue_output_cond) {
+    if (!opaque->acodec_cond || !opaque->acodec_cond ||
+        !opaque->acodec_first_dequeue_output_mutex || !opaque->acodec_first_dequeue_output_cond) {
         ALOGE("%s:open_video_decoder: SDL_CreateCond() failed\n", __func__);
         goto fail;
     }
@@ -1895,14 +1980,15 @@ IJKFF_Pipenode *ffpipenode_init_decoder_from_android_mediacodec(FFPlayer *ffp, I
     }
 
     return node;
-fail:
+    fail:
     ALOGW("%s: init fail\n", __func__);
     ffpipenode_free_p(&node);
     return NULL;
 }
 
-IJKFF_Pipenode *ffpipenode_create_video_decoder_from_android_mediacodec(FFPlayer *ffp, IJKFF_Pipeline *pipeline, SDL_Vout *vout)
-{
+IJKFF_Pipenode *
+ffpipenode_create_video_decoder_from_android_mediacodec(FFPlayer *ffp, IJKFF_Pipeline *pipeline,
+                                                        SDL_Vout *vout) {
     ALOGD("ffpipenode_create_video_decoder_from_android_mediacodec()\n");
     if (SDL_Android_GetApiLevel() < IJK_API_16_JELLY_BEAN)
         return NULL;
@@ -1914,23 +2000,23 @@ IJKFF_Pipenode *ffpipenode_create_video_decoder_from_android_mediacodec(FFPlayer
     if (!node)
         return node;
 
-    VideoState            *is     = ffp->is;
+    VideoState *is = ffp->is;
     IJKFF_Pipenode_Opaque *opaque = node->opaque;
-    JNIEnv                *env    = NULL;
-    int                    ret    = 0;
-    jobject                jsurface = NULL;
+    JNIEnv *env = NULL;
+    int ret = 0;
+    jobject jsurface = NULL;
 
-    node->func_destroy  = func_destroy;
+    node->func_destroy = func_destroy;
     if (ffp->mediacodec_sync) {
         node->func_run_sync = func_run_sync_loop;
     } else {
         node->func_run_sync = func_run_sync;
     }
-    node->func_flush    = func_flush;
-    opaque->pipeline    = pipeline;
-    opaque->ffp         = ffp;
-    opaque->decoder     = &is->viddec;
-    opaque->weak_vout   = vout;
+    node->func_flush = func_flush;
+    opaque->pipeline = pipeline;
+    opaque->ffp = ffp;
+    opaque->decoder = &is->viddec;
+    opaque->weak_vout = vout;
 
     opaque->codecpar = avcodec_parameters_alloc();
     if (!opaque->codecpar)
@@ -1941,94 +2027,100 @@ IJKFF_Pipenode *ffpipenode_create_video_decoder_from_android_mediacodec(FFPlayer
         goto fail;
 
     switch (opaque->codecpar->codec_id) {
-    case AV_CODEC_ID_H264:
-        if (!ffp->mediacodec_avc && !ffp->mediacodec_all_videos) {
-            ALOGE("%s: MediaCodec: AVC/H264 is disabled. codec_id:%d \n", __func__, opaque->codecpar->codec_id);
-            goto fail;
-        }
-        switch (opaque->codecpar->profile) {
-            case FF_PROFILE_H264_BASELINE:
-                ALOGI("%s: MediaCodec: H264_BASELINE: enabled\n", __func__);
-                break;
-            case FF_PROFILE_H264_CONSTRAINED_BASELINE:
-                ALOGI("%s: MediaCodec: H264_CONSTRAINED_BASELINE: enabled\n", __func__);
-                break;
-            case FF_PROFILE_H264_MAIN:
-                ALOGI("%s: MediaCodec: H264_MAIN: enabled\n", __func__);
-                break;
-            case FF_PROFILE_H264_EXTENDED:
-                ALOGI("%s: MediaCodec: H264_EXTENDED: enabled\n", __func__);
-                break;
-            case FF_PROFILE_H264_HIGH:
-                ALOGI("%s: MediaCodec: H264_HIGH: enabled\n", __func__);
-                break;
-            case FF_PROFILE_H264_HIGH_10:
-                ALOGW("%s: MediaCodec: H264_HIGH_10: disabled\n", __func__);
+        case AV_CODEC_ID_H264:
+            if (!ffp->mediacodec_avc && !ffp->mediacodec_all_videos) {
+                ALOGE("%s: MediaCodec: AVC/H264 is disabled. codec_id:%d \n", __func__,
+                      opaque->codecpar->codec_id);
                 goto fail;
-            case FF_PROFILE_H264_HIGH_10_INTRA:
-                ALOGW("%s: MediaCodec: H264_HIGH_10_INTRA: disabled\n", __func__);
+            }
+            switch (opaque->codecpar->profile) {
+                case FF_PROFILE_H264_BASELINE:
+                    ALOGI("%s: MediaCodec: H264_BASELINE: enabled\n", __func__);
+                    break;
+                case FF_PROFILE_H264_CONSTRAINED_BASELINE:
+                    ALOGI("%s: MediaCodec: H264_CONSTRAINED_BASELINE: enabled\n", __func__);
+                    break;
+                case FF_PROFILE_H264_MAIN:
+                    ALOGI("%s: MediaCodec: H264_MAIN: enabled\n", __func__);
+                    break;
+                case FF_PROFILE_H264_EXTENDED:
+                    ALOGI("%s: MediaCodec: H264_EXTENDED: enabled\n", __func__);
+                    break;
+                case FF_PROFILE_H264_HIGH:
+                    ALOGI("%s: MediaCodec: H264_HIGH: enabled\n", __func__);
+                    break;
+                case FF_PROFILE_H264_HIGH_10:
+                    ALOGW("%s: MediaCodec: H264_HIGH_10: disabled\n", __func__);
+                    goto fail;
+                case FF_PROFILE_H264_HIGH_10_INTRA:
+                    ALOGW("%s: MediaCodec: H264_HIGH_10_INTRA: disabled\n", __func__);
+                    goto fail;
+                case FF_PROFILE_H264_HIGH_422:
+                    ALOGW("%s: MediaCodec: H264_HIGH_10_422: disabled\n", __func__);
+                    goto fail;
+                case FF_PROFILE_H264_HIGH_422_INTRA:
+                    ALOGW("%s: MediaCodec: H264_HIGH_10_INTRA: disabled\n", __func__);
+                    goto fail;
+                case FF_PROFILE_H264_HIGH_444:
+                    ALOGW("%s: MediaCodec: H264_HIGH_10_444: disabled\n", __func__);
+                    goto fail;
+                case FF_PROFILE_H264_HIGH_444_PREDICTIVE:
+                    ALOGW("%s: MediaCodec: H264_HIGH_444_PREDICTIVE: disabled\n", __func__);
+                    goto fail;
+                case FF_PROFILE_H264_HIGH_444_INTRA:
+                    ALOGW("%s: MediaCodec: H264_HIGH_444_INTRA: disabled\n", __func__);
+                    goto fail;
+                case FF_PROFILE_H264_CAVLC_444:
+                    ALOGW("%s: MediaCodec: H264_CAVLC_444: disabled\n", __func__);
+                    goto fail;
+                default:
+                    ALOGW("%s: MediaCodec: (%d) unknown profile: disabled\n", __func__,
+                          opaque->codecpar->profile);
+                    goto fail;
+            }
+            strcpy(opaque->mcc.mime_type, SDL_AMIME_VIDEO_AVC);
+            opaque->mcc.profile = opaque->codecpar->profile;
+            opaque->mcc.level = opaque->codecpar->level;
+            break;
+        case AV_CODEC_ID_HEVC:
+            if (!ffp->mediacodec_hevc && !ffp->mediacodec_all_videos) {
+                ALOGE("%s: MediaCodec/HEVC is disabled. codec_id:%d \n", __func__,
+                      opaque->codecpar->codec_id);
                 goto fail;
-            case FF_PROFILE_H264_HIGH_422:
-                ALOGW("%s: MediaCodec: H264_HIGH_10_422: disabled\n", __func__);
+            }
+            strcpy(opaque->mcc.mime_type, SDL_AMIME_VIDEO_HEVC);
+            opaque->mcc.profile = opaque->codecpar->profile;
+            opaque->mcc.level = opaque->codecpar->level;
+            break;
+        case AV_CODEC_ID_MPEG2VIDEO:
+            if (!ffp->mediacodec_mpeg2 && !ffp->mediacodec_all_videos) {
+                ALOGE("%s: MediaCodec/MPEG2VIDEO is disabled. codec_id:%d \n", __func__,
+                      opaque->codecpar->codec_id);
                 goto fail;
-            case FF_PROFILE_H264_HIGH_422_INTRA:
-                ALOGW("%s: MediaCodec: H264_HIGH_10_INTRA: disabled\n", __func__);
+            }
+            strcpy(opaque->mcc.mime_type, SDL_AMIME_VIDEO_MPEG2VIDEO);
+            opaque->mcc.profile = opaque->codecpar->profile;
+            opaque->mcc.level = opaque->codecpar->level;
+            break;
+        case AV_CODEC_ID_MPEG4:
+            if (!ffp->mediacodec_mpeg4 && !ffp->mediacodec_all_videos) {
+                ALOGE("%s: MediaCodec/MPEG4 is disabled. codec_id:%d \n", __func__,
+                      opaque->codecpar->codec_id);
                 goto fail;
-            case FF_PROFILE_H264_HIGH_444:
-                ALOGW("%s: MediaCodec: H264_HIGH_10_444: disabled\n", __func__);
+            }
+            if ((opaque->codecpar->codec_tag & 0x0000FFFF) == 0x00005844) {
+                ALOGE("%s: divx is not supported \n", __func__);
                 goto fail;
-            case FF_PROFILE_H264_HIGH_444_PREDICTIVE:
-                ALOGW("%s: MediaCodec: H264_HIGH_444_PREDICTIVE: disabled\n", __func__);
-                goto fail;
-            case FF_PROFILE_H264_HIGH_444_INTRA:
-                ALOGW("%s: MediaCodec: H264_HIGH_444_INTRA: disabled\n", __func__);
-                goto fail;
-            case FF_PROFILE_H264_CAVLC_444:
-                ALOGW("%s: MediaCodec: H264_CAVLC_444: disabled\n", __func__);
-                goto fail;
-            default:
-                ALOGW("%s: MediaCodec: (%d) unknown profile: disabled\n", __func__, opaque->codecpar->profile);
-                goto fail;
-        }
-        strcpy(opaque->mcc.mime_type, SDL_AMIME_VIDEO_AVC);
-        opaque->mcc.profile = opaque->codecpar->profile;
-        opaque->mcc.level   = opaque->codecpar->level;
-        break;
-    case AV_CODEC_ID_HEVC:
-        if (!ffp->mediacodec_hevc && !ffp->mediacodec_all_videos) {
-            ALOGE("%s: MediaCodec/HEVC is disabled. codec_id:%d \n", __func__, opaque->codecpar->codec_id);
-            goto fail;
-        }
-        strcpy(opaque->mcc.mime_type, SDL_AMIME_VIDEO_HEVC);
-        opaque->mcc.profile = opaque->codecpar->profile;
-        opaque->mcc.level   = opaque->codecpar->level;
-        break;
-    case AV_CODEC_ID_MPEG2VIDEO:
-        if (!ffp->mediacodec_mpeg2 && !ffp->mediacodec_all_videos) {
-            ALOGE("%s: MediaCodec/MPEG2VIDEO is disabled. codec_id:%d \n", __func__, opaque->codecpar->codec_id);
-            goto fail;
-        }
-        strcpy(opaque->mcc.mime_type, SDL_AMIME_VIDEO_MPEG2VIDEO);
-        opaque->mcc.profile = opaque->codecpar->profile;
-        opaque->mcc.level   = opaque->codecpar->level;
-        break;
-    case AV_CODEC_ID_MPEG4:
-        if (!ffp->mediacodec_mpeg4 && !ffp->mediacodec_all_videos) {
-            ALOGE("%s: MediaCodec/MPEG4 is disabled. codec_id:%d \n", __func__, opaque->codecpar->codec_id);
-            goto fail;
-        }
-        if ((opaque->codecpar->codec_tag & 0x0000FFFF) == 0x00005844) {
-            ALOGE("%s: divx is not supported \n", __func__);
-            goto fail;
-        }
-        strcpy(opaque->mcc.mime_type, SDL_AMIME_VIDEO_MPEG4);
-        opaque->mcc.profile = opaque->codecpar->profile >= 0 ? opaque->codecpar->profile : 0;
-        opaque->mcc.level   = opaque->codecpar->level >= 0 ? opaque->codecpar->level : 1;
-        break;
+            }
+            strcpy(opaque->mcc.mime_type, SDL_AMIME_VIDEO_MPEG4);
+            opaque->mcc.profile = opaque->codecpar->profile >= 0 ? opaque->codecpar->profile : 0;
+            opaque->mcc.level = opaque->codecpar->level >= 0 ? opaque->codecpar->level : 1;
+            break;
 
-    default:
-        ALOGE("%s:create: not H264 or H265/HEVC, codec_id:%d \n", __func__, opaque->codecpar->codec_id);
-        goto fail;
+        default:
+            ALOGE("%s:create: not H264 or H265/HEVC, codec_id:%d \n", __func__,
+                  opaque->codecpar->codec_id);
+            goto fail;
     }
 
     if (JNI_OK != SDL_JNI_SetupThreadEnv(&env)) {
@@ -2036,14 +2128,15 @@ IJKFF_Pipenode *ffpipenode_create_video_decoder_from_android_mediacodec(FFPlayer
         goto fail;
     }
 
-    opaque->acodec_mutex                      = SDL_CreateMutex();
-    opaque->acodec_cond                       = SDL_CreateCond();
+    opaque->acodec_mutex = SDL_CreateMutex();
+    opaque->acodec_cond = SDL_CreateCond();
     opaque->acodec_first_dequeue_output_mutex = SDL_CreateMutex();
-    opaque->acodec_first_dequeue_output_cond  = SDL_CreateCond();
-    opaque->any_input_mutex                   = SDL_CreateMutex();
-    opaque->any_input_cond                    = SDL_CreateCond();
+    opaque->acodec_first_dequeue_output_cond = SDL_CreateCond();
+    opaque->any_input_mutex = SDL_CreateMutex();
+    opaque->any_input_cond = SDL_CreateCond();
 
-    if (!opaque->acodec_cond || !opaque->acodec_cond || !opaque->acodec_first_dequeue_output_mutex || !opaque->acodec_first_dequeue_output_cond) {
+    if (!opaque->acodec_cond || !opaque->acodec_cond ||
+        !opaque->acodec_first_dequeue_output_mutex || !opaque->acodec_first_dequeue_output_cond) {
         ALOGE("%s:open_video_decoder: SDL_CreateCond() failed\n", __func__);
         goto fail;
     }
@@ -2080,7 +2173,7 @@ IJKFF_Pipenode *ffpipenode_create_video_decoder_from_android_mediacodec(FFPlayer
     SDL_SpeedSamplerReset(&opaque->sampler);
     ffp->stat.vdec_type = FFP_PROPV_DECODER_MEDIACODEC;
     return node;
-fail:
+    fail:
     ffpipenode_free_p(&node);
     return NULL;
 }

@@ -37,8 +37,8 @@ git clone https://github.com/ShikinChen/ijkplayer-android --recursive
 git clone https://github.com/ShikinChen/ijkplayer-android
 cd ijkplayer-android
 
-#编译ffmpeg一定要使用ndk r24
-export ANDROID_NDK=NDK r24的路径
+#编译ffmpeg一定要使用ndk r25
+export ANDROID_NDK=NDK r25的路径
 
 cd android/contrib
 ./compile-ffmpeg.sh arm64

@@ -43,10 +43,6 @@ export ANDROID_NDK=NDK r25的路径
 cd android/contrib
 ./compile-ffmpeg.sh arm64
 
-#可选
-cd ..
-./compile-ijk.sh arm64
-
 #执行完compile-ffmpeg.sh arm64 编译完ffmpeg的arm64动态库后 直接将 ./android/ijkplayer 导入整个项目
 
 ```

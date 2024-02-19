@@ -4,7 +4,7 @@
 - Common
  - Mac OS X 14.3
 - Android
- - [NDK r24](https://github.com/android/ndk/wiki/Unsupported-Downloads)
+ - [NDK r25](https://github.com/android/ndk/wiki/Unsupported-Downloads)
  - Android Studio 2023.1.1 Patch 2
  - Gradle 7.2
  - Xcode 12.5.1

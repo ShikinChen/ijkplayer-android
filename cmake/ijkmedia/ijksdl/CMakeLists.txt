@@ -28,7 +28,7 @@ find_library(android-lib android)
 
 target_link_libraries(
         ijksdl
-        ijkj4a ijkffmpeg ijkyuv ${EGL-lib} ${GLES-lib} ${OpenSLES-lib} ${android-lib})
+        ijkj4a ${FFMPEG_LIBS} ijkyuv ${EGL-lib} ${GLES-lib} ${OpenSLES-lib} ${android-lib})
 
 target_include_directories(ijksdl
         PUBLIC

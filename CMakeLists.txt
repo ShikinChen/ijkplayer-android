@@ -20,28 +20,29 @@ set(FFMPEG_LIB_NAME ijkffmpeg)
 #ffmpeg
 file(GLOB FFMPEG_LIB_FILES
         ${FFMPEG_LIB_PATH}/*.a
-        )
-add_library(${FFMPEG_LIB_NAME}
-        SHARED
-        ${FFMPEG_ABI_PATH}/config.h)
-set_target_properties(${FFMPEG_LIB_NAME} PROPERTIES LINKER_LANGUAGE C POSITION_INDEPENDENT_CODE ON)
+)
+#add_library(${FFMPEG_LIB_NAME}
+#        SHARED
+#        ${FFMPEG_ABI_PATH}/config.h)
+#set_target_properties(${FFMPEG_LIB_NAME} PROPERTIES LINKER_LANGUAGE C POSITION_INDEPENDENT_CODE ON)
 foreach (FFMPEG_LIB_FILE ${FFMPEG_LIB_FILES})
-    get_filename_component(LIB_NAME ${FFMPEG_LIB_FILE} NAME_WE)
-    string(REPLACE "lib" "" LIB_NAME "${LIB_NAME}")
-    list(APPEND FFMPEG_LIBS ${LIB_NAME})
-    add_library(${LIB_NAME}
-            SHARED
-            IMPORTED)
-    set_target_properties(${LIB_NAME}
-            PROPERTIES
-            IMPORTED_LOCATION ${FFMPEG_LIB_FILE})
+    get_filename_component(LIB_NAME ${FFMPEG_LIB_FILE} NAME_WLE)
+    list(FIND FFMPEG_LIBS ${LIB_NAME} index)
+    if (index EQUAL -1)
+        list(APPEND FFMPEG_LIBS ${LIB_NAME})
+        add_library(${LIB_NAME}
+                STATIC
+                IMPORTED)
+        set_target_properties(${LIB_NAME}
+                PROPERTIES
+                IMPORTED_LOCATION ${FFMPEG_LIB_FILE})
+    endif ()
 endforeach ()
-
-set_target_properties(${FFMPEG_LIB_NAME}
-        PROPERTIES INTERFACE_INCLUDE_DIRECTORIES
-        ${FFMPEG_ABI_PATH}/include
-        )
-message(WARNING "FFMPEG_LIBS:${FFMPEG_LIBS}")
-target_link_libraries(${FFMPEG_LIB_NAME} INTERFACE
-        ${FFMPEG_LIBS})
+include_directories(${FFMPEG_ABI_PATH}/include)
+#set_target_properties(${FFMPEG_LIB_NAME}
+#        PROPERTIES INTERFACE_INCLUDE_DIRECTORIES
+#        ${FFMPEG_ABI_PATH}/include
+#)
+#target_link_libraries(${FFMPEG_LIB_NAME} INTERFACE
+#        ${FFMPEG_LIBS})
 add_subdirectory(cmake/ijkmedia)

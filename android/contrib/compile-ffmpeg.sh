@@ -54,8 +54,8 @@ echo_nextstep_help() {
     echo "--------------------"
     echo "[*] Finished"
     echo "--------------------"
-    echo "# to continue to build ijkplayer, run script below,"
-    echo "sh compile-ijk.sh "
+    # echo "# to continue to build ijkplayer, run script below,"
+    # echo "sh compile-ijk.sh "
 }
 
 #----------

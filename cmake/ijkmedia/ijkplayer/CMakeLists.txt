@@ -37,4 +37,4 @@ find_library(jnigraphics-lib jnigraphics)
 
 target_link_libraries(
         ijkplayer
-        ijkffmpeg ijkj4a ijksdl ijksoundtouch ${m-lib} ${z-lib} ${jnigraphics-lib})
+        ${FFMPEG_LIBS} ijkj4a ijksdl ijksoundtouch ${m-lib} ${z-lib} ${jnigraphics-lib})

@@ -19,7 +19,7 @@
 # IJK_FFMPEG_UPSTREAM=git://git.videolan.org/ffmpeg.git
 IJK_FFMPEG_UPSTREAM=https://github.com/ShikinChen/FFmpeg.git
 IJK_FFMPEG_FORK=https://github.com/ShikinChen/FFmpeg.git
-IJK_FFMPEG_COMMIT=ff5.1.4--ijk0.8.8
+IJK_FFMPEG_COMMIT=ff6.1.1--ijk0.8.8
 IJK_FFMPEG_LOCAL_REPO=extra/ffmpeg
 
 set -e

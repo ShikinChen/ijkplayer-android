@@ -2986,7 +2986,18 @@ static int stream_component_open(FFPlayer *ffp, int stream_index) {
         goto fail;
     avctx->pkt_timebase = ic->streams[stream_index]->time_base;
     //MARK 查找对应解码器
-    codec = avcodec_find_decoder(avctx->codec_id);
+    if (avctx->codec_id == AV_CODEC_ID_H264) {
+        codec = avcodec_find_decoder_by_name("h264_mediacodec");
+    } else if (avctx->codec_id == AV_CODEC_ID_HEVC) {
+        codec = avcodec_find_decoder_by_name("hevc_mediacodec");
+    } else if (avctx->codec_id == AV_CODEC_ID_AV1) {
+        codec = avcodec_find_decoder_by_name("av1_mediacodec");
+    }
+
+    if (codec == NULL) {
+        codec = avcodec_find_decoder(avctx->codec_id);
+    }
+
 
     switch (avctx->codec_type) {
         case AVMEDIA_TYPE_AUDIO   :

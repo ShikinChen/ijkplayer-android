@@ -26,20 +26,19 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <inttypes.h>
+#include <libavfilter/buffersrc.h>
 
 struct IjkAVDictionary {
     int count;
     IjkAVDictionaryEntry *elems;
 };
 
-int ijk_av_dict_count(const IjkAVDictionary *m)
-{
+int ijk_av_dict_count(const IjkAVDictionary *m) {
     return m ? m->count : 0;
 }
 
 IjkAVDictionaryEntry *ijk_av_dict_get(const IjkAVDictionary *m, const char *key,
-                               const IjkAVDictionaryEntry *prev, int flags)
-{
+                                      const IjkAVDictionaryEntry *prev, int flags) {
     unsigned int i, j;
 
     if (!m)
@@ -53,11 +52,9 @@ IjkAVDictionaryEntry *ijk_av_dict_get(const IjkAVDictionary *m, const char *key,
     for (; i < m->count; i++) {
         const char *s = m->elems[i].key;
         if (flags & IJK_AV_DICT_MATCH_CASE)
-            for (j = 0; s[j] == key[j] && key[j]; j++)
-                ;
+            for (j = 0; s[j] == key[j] && key[j]; j++);
         else
-            for (j = 0; toupper(s[j]) == toupper(key[j]) && key[j]; j++)
-                ;
+            for (j = 0; toupper(s[j]) == toupper(key[j]) && key[j]; j++);
         if (key[j])
             continue;
         if (s[j] && !(flags & IJK_AV_DICT_IGNORE_SUFFIX))
@@ -68,8 +65,7 @@ IjkAVDictionaryEntry *ijk_av_dict_get(const IjkAVDictionary *m, const char *key,
 }
 
 int ijk_av_dict_set(IjkAVDictionary **pm, const char *key, const char *value,
-                int flags)
-{
+                    int flags) {
     IjkAVDictionary *m = *pm;
     IjkAVDictionaryEntry *tag = NULL;
     char *oldval = NULL, *copy_key = NULL, *copy_value = NULL;
@@ -78,15 +74,15 @@ int ijk_av_dict_set(IjkAVDictionary **pm, const char *key, const char *value,
         tag = ijk_av_dict_get(m, key, NULL, flags);
     }
     if (flags & IJK_AV_DICT_DONT_STRDUP_KEY)
-        copy_key = (void *)key;
+        copy_key = (void *) key;
     else
         copy_key = strdup(key);
     if (flags & IJK_AV_DICT_DONT_STRDUP_VAL)
-        copy_value = (void *)value;
+        copy_value = (void *) value;
     else if (copy_key)
         copy_value = strdup(value);
     if (!m)
-        m = *pm = (IjkAVDictionary *)calloc(1, sizeof(*m));
+        m = *pm = (IjkAVDictionary *) calloc(1, sizeof(*m));
     if (!m || (key && !copy_key) || (value && !copy_value))
         goto err_out;
 
@@ -100,11 +96,12 @@ int ijk_av_dict_set(IjkAVDictionary **pm, const char *key, const char *value,
             oldval = tag->value;
         else
             free(tag->value);
-            free(tag->key);
+        free(tag->key);
         *tag = m->elems[--m->count];
     } else if (copy_value) {
-        IjkAVDictionaryEntry *tmp = (IjkAVDictionaryEntry *)realloc(m->elems,
-                                            (m->count + 1) * sizeof(*m->elems));
+        IjkAVDictionaryEntry *tmp = (IjkAVDictionaryEntry *) realloc(m->elems,
+                                                                     (m->count + 1) *
+                                                                     sizeof(*m->elems));
         if (!tmp)
             goto err_out;
         m->elems = tmp;
@@ -114,7 +111,7 @@ int ijk_av_dict_set(IjkAVDictionary **pm, const char *key, const char *value,
         m->elems[m->count].value = copy_value;
         if (oldval && flags & IJK_AV_DICT_APPEND) {
             size_t len = strlen(oldval) + strlen(copy_value) + 1;
-            char *newval = (char *)calloc(1, len);
+            char *newval = (char *) calloc(1, len);
             if (!newval)
                 goto err_out;
             strlcat(newval, oldval, len);
@@ -134,7 +131,7 @@ int ijk_av_dict_set(IjkAVDictionary **pm, const char *key, const char *value,
 
     return 0;
 
-err_out:
+    err_out:
     if (m && !m->count) {
         ijk_av_freep(&m->elems);
         ijk_av_freep(pm);
@@ -145,8 +142,7 @@ err_out:
 }
 
 int ijk_av_dict_set_int(IjkAVDictionary **pm, const char *key, int64_t value,
-                int flags)
-{
+                        int flags) {
     char valuestr[22];
     snprintf(valuestr, sizeof(valuestr), "%"PRId64, value);
     flags &= ~IJK_AV_DICT_DONT_STRDUP_VAL;
@@ -160,10 +156,10 @@ int ijk_av_dict_set_intptr(IjkAVDictionary **pm, const char *key, uintptr_t valu
     return ijk_av_dict_set(pm, key, valuestr, flags);
 }
 
-uintptr_t ijk_av_dict_strtoptr(char * value) {
+uintptr_t ijk_av_dict_strtoptr(char *value) {
     uintptr_t ptr = NULL;
     char *next = NULL;
-    if(value[0] !='0' || (value[1]|0x20)!='x') {
+    if (value[0] != '0' || (value[1] | 0x20) != 'x') {
         return NULL;
     }
     ptr = strtoll(value, &next, 16);
@@ -173,7 +169,7 @@ uintptr_t ijk_av_dict_strtoptr(char * value) {
     return ptr;
 }
 
-uintptr_t ijk_av_dict_get_intptr(const IjkAVDictionary *m, const char* key) {
+uintptr_t ijk_av_dict_get_intptr(const IjkAVDictionary *m, const char *key) {
     uintptr_t ptr = NULL;
     IjkAVDictionaryEntry *t = NULL;
     if ((t = av_dict_get(m, key, NULL, 0))) {
@@ -182,8 +178,7 @@ uintptr_t ijk_av_dict_get_intptr(const IjkAVDictionary *m, const char* key) {
     return NULL;
 }
 
-void ijk_av_dict_free(IjkAVDictionary **pm)
-{
+void ijk_av_dict_free(IjkAVDictionary **pm) {
     IjkAVDictionary *m = *pm;
 
     if (m) {
@@ -196,8 +191,7 @@ void ijk_av_dict_free(IjkAVDictionary **pm)
     ijk_av_freep(pm);
 }
 
-int ijk_av_dict_copy(IjkAVDictionary **dst, const IjkAVDictionary *src, int flags)
-{
+int ijk_av_dict_copy(IjkAVDictionary **dst, const IjkAVDictionary *src, int flags) {
     IjkAVDictionaryEntry *t = NULL;
 
     while ((t = ijk_av_dict_get(src, "", t, IJK_AV_DICT_IGNORE_SUFFIX))) {
@@ -207,4 +201,40 @@ int ijk_av_dict_copy(IjkAVDictionary **dst, const IjkAVDictionary *src, int flag
     }
 
     return 0;
+}
+
+int av_dict_set_intptr(AVDictionary **pm, const char *key, uintptr_t value,
+                       int flags) {
+    char valuestr[22];
+    snprintf(valuestr, sizeof(valuestr), "%p", value);
+    flags &= ~AV_DICT_DONT_STRDUP_VAL;
+    return av_dict_set(pm, key, valuestr, flags);
+}
+
+uintptr_t av_dict_get_intptr(const AVDictionary *m, const char *key) {
+    uintptr_t ptr = NULL;
+    AVDictionaryEntry *t = NULL;
+    if ((t = av_dict_get(m, key, NULL, 0))) {
+        return av_dict_strtoptr(t->value);
+    }
+    return NULL;
+}
+
+uintptr_t av_dict_strtoptr(char *value) {
+    uintptr_t ptr = NULL;
+    char *next = NULL;
+    if (!value || value[0] != '0' || (value[1] | 0x20) != 'x') {
+        return NULL;
+    }
+    ptr = strtoull(value, &next, 16);
+    if (next == value) {
+        return NULL;
+    }
+    return ptr;
+}
+
+char *av_dict_ptrtostr(uintptr_t value) {
+    char valuestr[22] = {0};
+    snprintf(valuestr, sizeof(valuestr), "%p", value);
+    return av_strdup(valuestr);
 }

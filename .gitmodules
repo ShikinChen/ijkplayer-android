@@ -8,5 +8,5 @@
 	branch = ijk-r0.2.1-dev
 [submodule "extra/ffmpeg"]
 	path = extra/ffmpeg
-	url = https://github.com/ShikinChen/FFmpeg.git
-	branch = ff5.1.4--ijk0.8.8
+	url = https://github.com/ShikinChen/FFmpeg
+	branch = ff6.1.1--ijk0.8.8

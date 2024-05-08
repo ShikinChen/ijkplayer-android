@@ -167,3 +167,5 @@ lint/tmp/
 
 cmake-build-*
 
+.python-version
+

@@ -157,25 +157,25 @@ int ijk_av_dict_set_intptr(IjkAVDictionary **pm, const char *key, uintptr_t valu
 }
 
 uintptr_t ijk_av_dict_strtoptr(char *value) {
-    uintptr_t ptr = NULL;
+    uintptr_t ptr = (uintptr_t)NULL;
     char *next = NULL;
     if (value[0] != '0' || (value[1] | 0x20) != 'x') {
-        return NULL;
+        return (uintptr_t)NULL;
     }
     ptr = strtoll(value, &next, 16);
     if (next == value) {
-        return NULL;
+        return (uintptr_t)NULL;
     }
     return ptr;
 }
 
 uintptr_t ijk_av_dict_get_intptr(const IjkAVDictionary *m, const char *key) {
-    uintptr_t ptr = NULL;
+    uintptr_t ptr = (uintptr_t)NULL;
     IjkAVDictionaryEntry *t = NULL;
     if ((t = av_dict_get(m, key, NULL, 0))) {
         return ijk_av_dict_strtoptr(t->value);
     }
-    return NULL;
+    return (uintptr_t)NULL;
 }
 
 void ijk_av_dict_free(IjkAVDictionary **pm) {
@@ -212,23 +212,23 @@ int av_dict_set_intptr(AVDictionary **pm, const char *key, uintptr_t value,
 }
 
 uintptr_t av_dict_get_intptr(const AVDictionary *m, const char *key) {
-    uintptr_t ptr = NULL;
+    uintptr_t ptr = (uintptr_t)NULL;
     AVDictionaryEntry *t = NULL;
     if ((t = av_dict_get(m, key, NULL, 0))) {
         return av_dict_strtoptr(t->value);
     }
-    return NULL;
+    return (uintptr_t)NULL;
 }
 
 uintptr_t av_dict_strtoptr(char *value) {
-    uintptr_t ptr = NULL;
+    uintptr_t ptr = (uintptr_t)NULL;
     char *next = NULL;
     if (!value || value[0] != '0' || (value[1] | 0x20) != 'x') {
-        return NULL;
+        return (uintptr_t)NULL;
     }
     ptr = strtoull(value, &next, 16);
     if (next == value) {
-        return NULL;
+        return (uintptr_t)NULL;
     }
     return ptr;
 }

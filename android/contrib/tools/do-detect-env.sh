@@ -74,7 +74,7 @@ case "$IJK_NDK_REL" in
             exit 1
         fi
         ;;
-    17* | 22* | 23* | 24* | 25*)
+    17* | 22* | 23* | 24* | 25* | 26* | 27*)
         export IJK_CC=clang
         ;;
     *)
@@ -86,7 +86,7 @@ case "$IJK_NDK_REL" in
 esac
 
 case "$IJK_NDK_REL" in
-23* | 24* | 25*)
+23* | 24* | 25* | 26* | 27*)
     export IJK_IS_NOT_SUPPORT_ARM=true
     ;;
 esac

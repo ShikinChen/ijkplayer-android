@@ -27,6 +27,7 @@
 #include "libavutil/opt.h"
 
 #include "libavutil/application.h"
+#include "ijkavutil/ijkdict.h"
 
 typedef struct Context {
     AVClass        *class;

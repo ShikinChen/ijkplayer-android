@@ -28,6 +28,7 @@
 
 #include "ijkavformat.h"
 #include "libavutil/application.h"
+#include "ijkavutil/ijkdict.h"
 
 typedef struct {
     AVClass *class;

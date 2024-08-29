@@ -25,6 +25,7 @@
 #include "libavutil/avstring.h"
 #include "libavutil/log.h"
 #include "libavutil/opt.h"
+#include "ijkavutil/ijkdict.h"
 
 #include "libavutil/application.h"
 

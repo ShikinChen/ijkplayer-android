@@ -6,7 +6,7 @@
 - Common
  - Mac OS X 14.3/Ubuntu 22.04
 - Android
- - [NDK r25](https://github.com/android/ndk/wiki/Unsupported-Downloads)
+ - [NDK r27](https://github.com/android/ndk/wiki/Unsupported-Downloads)
  - Android Studio 2023.1.1 Patch 2
  - Gradle 7.2
  - Xcode 12.5.1
@@ -51,8 +51,8 @@ git submodule update --init --remote --recursive --progress
 ```
 cd ijkplayer-android
 
-#编译ffmpeg一定要使用ndk r25
-export ANDROID_NDK=NDK r25的路径
+#编译ffmpeg一定要使用ndk r27
+export ANDROID_NDK=NDK r27的路径
 
 cd android/contrib
 ./compile-ffmpeg.sh arm64

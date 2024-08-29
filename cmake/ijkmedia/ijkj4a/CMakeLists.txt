@@ -31,3 +31,8 @@ target_include_directories(ijkj4a
         PUBLIC
         ${IJKJ4A_PATH}
         )
+
+target_link_options(ijkj4a 
+        PRIVATE 
+        "-Wl,-z,max-page-size=16384"
+        )

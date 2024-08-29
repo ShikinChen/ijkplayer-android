@@ -17,3 +17,8 @@ target_include_directories(ijkyuv
         PUBLIC
         ${IJKYUV_PATH}/include
         )
+
+target_link_options(ijkyuv 
+        PRIVATE 
+        "-Wl,-z,max-page-size=16384"
+        )            

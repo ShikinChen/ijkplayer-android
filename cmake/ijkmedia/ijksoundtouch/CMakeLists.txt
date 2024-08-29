@@ -19,3 +19,8 @@ target_include_directories(ijksoundtouch
         ${IJKSOUNDTOUCH_PATH}
         ${IJKSOUNDTOUCH_PATH}/include
         )
+
+target_link_options(ijksoundtouch 
+        PRIVATE 
+        "-Wl,-z,max-page-size=16384"
+        )             

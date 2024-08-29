@@ -35,3 +35,9 @@ target_include_directories(ijksdl
         ${IJKSDL_PATH}
         ${IJKMEDIA_PATH}
         )
+
+
+target_link_options(ijksdl 
+        PRIVATE 
+        "-Wl,-z,max-page-size=16384"
+        )            

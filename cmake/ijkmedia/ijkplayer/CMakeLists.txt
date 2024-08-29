@@ -38,3 +38,8 @@ find_library(jnigraphics-lib jnigraphics)
 target_link_libraries(
         ijkplayer
         ${FFMPEG_LIBS} ijkj4a ijksdl ijksoundtouch ${m-lib} ${z-lib} ${jnigraphics-lib})
+
+target_link_options(ijkplayer 
+        PRIVATE 
+        "-Wl,-z,max-page-size=16384"
+        )        

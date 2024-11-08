@@ -286,6 +286,7 @@ FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-vulkan"
 FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-shared"
 FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-static"
 FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-doc"
+
 # FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-symver"
 
 if [ "$FF_ARCH" = "x86" ]; then
@@ -308,6 +309,10 @@ debug)
     FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-small"
     ;;
 esac
+
+FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS -lm"
+
+echo FF_EXTRA_LDFLAGS:${FF_EXTRA_LDFLAGS}
 
 #--------------------
 echo ""

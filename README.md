@@ -66,12 +66,13 @@ export ANDROID_NDK=NDK r27的路径
 #ndk r27已经不支持armeabi-v7a
 cd android/contrib
 ./compile-ffmpeg.sh arm64
-
 ```
 
-执行完 compile-ffmpeg.sh arm64 编译完 ffmpeg 的 arm64 静态库后,用android studio 直接将 ijkplayer-android/android/ijkplayer/android/ijkplayer 导入整个项目,并且在设置修改 Gradle JDK 为 java-11
+执行完 compile-ffmpeg.sh arm64 编译完 ffmpeg 的 arm64 静态库后,用 android studio 直接将 ijkplayer-android/android/ijkplayer/android/ijkplayer 导入整个项目,并且在设置修改 Gradle JDK 为 java-11
 
 ### 打包
+
+#### 基于 ndk r27 打包 arm64-v8a 版本(项目默认是 ndk r27)
 
 执行之前一样要定义 ANDROID_NDK 环境变量,并且 ffmpeg 已经编译好
 
@@ -85,3 +86,38 @@ cd ijkplayer-android/android/ijkplayer
 ```
 
 最后生成的 ijkplayer-java-release.aar 在 ijkplayer-android/android/ijkplayer/ijkplayer-java/build/outputs/aar/目录下
+
+#### 基于 ndk r21 打包 armeabi-v7a 和 arm64-v8a 版本
+
+```shell
+export ANDROID_NDK=NDK r21的路径
+```
+
+然后修改 ijkplayer-android/android/ijkplayer/ijkplayer-java/build.gradle 的 ndk 和 ndkVersion,如果需要运行 ijkplayer-example 项目也一样修改它的 build.gradle 的 ndk 和 ndkVersion
+
+```gradle
+ndk {
+    abiFilters 'armeabi-v7a', 'arm64-v8a'
+}
+```
+
+```gradle
+ ndkVersion '21.4.7075529'
+```
+
+重新进行 ffmpeg 编译的 armv7a 和 arm64
+
+```shell
+cd ijkplayer-android
+cd android/contrib
+./compile-ffmpeg.sh armv7a
+./compile-ffmpeg.sh arm64
+```
+
+打包 aar
+
+```shell
+cd ../..
+cd android/ijkplayer
+./gradlew :ijkplayer-java:assembleRelease
+```

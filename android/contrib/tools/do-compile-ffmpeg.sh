@@ -312,8 +312,6 @@ esac
 
 FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS -lm"
 
-echo FF_EXTRA_LDFLAGS:${FF_EXTRA_LDFLAGS}
-
 #--------------------
 echo ""
 echo "--------------------"

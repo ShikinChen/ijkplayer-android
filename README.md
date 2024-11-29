@@ -2,6 +2,12 @@
 
 ## <mark>为了学习 aosp 已经替换 Ubuntu 主开发系统(主要 mac book pro 太贵),脚本适配 Ubuntu 为主,MacOS 尽量适配</mark>
 
+### <mark>有升级到FFmpeg 7.1的分支,因为7.1的api变化有点大,对源码修改比较大,修改后不知道稳定如何,所以单独开一个分支,需要的请自行切换或者拉取</mark>
+
+```shell
+git clone https://github.com/ShikinChen/ijkplayer-android --recursive -b ijk0.8.8--ff7.1
+```
+
 ### 构建环境
 
 - Common
@@ -68,7 +74,9 @@ cd android/contrib
 ./compile-ffmpeg.sh arm64
 ```
 
-执行完 compile-ffmpeg.sh arm64 编译完 ffmpeg 的 arm64 静态库后,用 android studio 直接将 ijkplayer-android/android/ijkplayer/android/ijkplayer 导入整个项目,并且在设置修改 Gradle JDK 为 java-11
+执行完 compile-ffmpeg.sh arm64 编译完 ffmpeg 的 arm64 静态库后,用 android studio 直接将
+ijkplayer-android/android/ijkplayer/android/ijkplayer 导入整个项目,并且在设置修改 Gradle JDK 为
+java-11
 
 ### 打包
 
@@ -85,7 +93,8 @@ cd ijkplayer-android/android/ijkplayer
 ./gradlew :ijkplayer-java:assembleRelease
 ```
 
-最后生成的 ijkplayer-java-release.aar 在 ijkplayer-android/android/ijkplayer/ijkplayer-java/build/outputs/aar/目录下
+最后生成的 ijkplayer-java-release.aar 在
+ijkplayer-android/android/ijkplayer/ijkplayer-java/build/outputs/aar/目录下
 
 #### 基于 ndk r21 打包 armeabi-v7a 和 arm64-v8a 版本
 
@@ -93,7 +102,8 @@ cd ijkplayer-android/android/ijkplayer
 export ANDROID_NDK=NDK r21的路径
 ```
 
-然后修改 ijkplayer-android/android/ijkplayer/ijkplayer-java/build.gradle 的 ndk 和 ndkVersion,如果需要运行 ijkplayer-example 项目也一样修改它的 build.gradle 的 ndk 和 ndkVersion
+然后修改 ijkplayer-android/android/ijkplayer/ijkplayer-java/build.gradle 的 ndk 和 ndkVersion,如果需要运行
+ijkplayer-example 项目也一样修改它的 build.gradle 的 ndk 和 ndkVersion
 
 ```gradle
 ndk {

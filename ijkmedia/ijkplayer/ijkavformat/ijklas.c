@@ -6,6 +6,7 @@
 
 #include <errno.h>
 #include <stdlib.h>
+#include "libavformat/demux.h"
 
 #ifdef __ANDROID__
 
@@ -2108,18 +2109,18 @@ static const AVClass ijklas_class = {
         .version    = LIBAVUTIL_VERSION_INT,
 };
 
-AVInputFormat ijkff_ijklas_demuxer = {
-        .name           = "ijklas",
-        .long_name      = "Live Adaptive Streaming",
-        .priv_class     = &ijklas_class,
+FFInputFormat ijkff_ijklas_demuxer = {
+        .p.name           = "ijklas",
+        .p.long_name      = "Live Adaptive Streaming",
+        .p.priv_class     = &ijklas_class,
         .priv_data_size = sizeof(LasContext),
         .read_probe     = las_probe,
         .read_header    = las_read_header,
         .read_packet    = las_read_packet,
         .read_close     = las_close,
         .read_seek      = las_read_seek,
-        .extensions     = "las",
-        .flags          = AVFMT_NOFILE
+        .p.extensions     = "las",
+        .p.flags          = AVFMT_NOFILE
 };
 
 

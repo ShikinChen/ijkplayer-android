@@ -37,9 +37,8 @@ struct IjkMediaMeta {
     IjkMediaMeta **children;
 };
 
-IjkMediaMeta *ijkmeta_create()
-{
-    IjkMediaMeta *meta = (IjkMediaMeta *)calloc(1, sizeof(IjkMediaMeta));
+IjkMediaMeta *ijkmeta_create() {
+    IjkMediaMeta *meta = (IjkMediaMeta *) calloc(1, sizeof(IjkMediaMeta));
     if (!meta)
         return NULL;
 
@@ -48,19 +47,17 @@ IjkMediaMeta *ijkmeta_create()
         goto fail;
 
     return meta;
-fail:
+    fail:
     ijkmeta_destroy(meta);
     return NULL;
 }
 
-void ijkmeta_reset(IjkMediaMeta *meta)
-{
+void ijkmeta_reset(IjkMediaMeta *meta) {
     if (meta && meta->dict)
         av_dict_free(&meta->dict);
 }
 
-void ijkmeta_destroy(IjkMediaMeta *meta)
-{
+void ijkmeta_destroy(IjkMediaMeta *meta) {
     if (!meta)
         return;
 
@@ -69,7 +66,7 @@ void ijkmeta_destroy(IjkMediaMeta *meta)
     }
 
     if (meta->children) {
-        for(int i = 0; i < meta->children_count; ++i) {
+        for (int i = 0; i < meta->children_count; ++i) {
             IjkMediaMeta *child = meta->children[i];
             if (child) {
                 ijkmeta_destroy(child);
@@ -83,8 +80,7 @@ void ijkmeta_destroy(IjkMediaMeta *meta)
     free(meta);
 }
 
-void ijkmeta_destroy_p(IjkMediaMeta **meta)
-{
+void ijkmeta_destroy_p(IjkMediaMeta **meta) {
     if (!meta)
         return;
 
@@ -92,42 +88,40 @@ void ijkmeta_destroy_p(IjkMediaMeta **meta)
     *meta = NULL;
 }
 
-void ijkmeta_lock(IjkMediaMeta *meta)
-{
+void ijkmeta_lock(IjkMediaMeta *meta) {
     if (!meta || !meta->mutex)
         return;
 
     SDL_LockMutex(meta->mutex);
 }
 
-void ijkmeta_unlock(IjkMediaMeta *meta)
-{
+void ijkmeta_unlock(IjkMediaMeta *meta) {
     if (!meta || !meta->mutex)
         return;
 
     SDL_UnlockMutex(meta->mutex);
 }
 
-void ijkmeta_append_child_l(IjkMediaMeta *meta, IjkMediaMeta *child)
-{
+void ijkmeta_append_child_l(IjkMediaMeta *meta, IjkMediaMeta *child) {
     if (!meta || !child)
         return;
 
     if (!meta->children) {
-        meta->children = (IjkMediaMeta **)calloc(IJK_META_INIT_CAPACITY, sizeof(IjkMediaMeta *));
+        meta->children = (IjkMediaMeta **) calloc(IJK_META_INIT_CAPACITY, sizeof(IjkMediaMeta *));
         if (!meta->children)
             return;
-        meta->children_count    = 0;
+        meta->children_count = 0;
         meta->children_capacity = IJK_META_INIT_CAPACITY;
     } else if (meta->children_count >= meta->children_capacity) {
         size_t new_capacity = meta->children_capacity * 2;
-        IjkMediaMeta **new_children = (IjkMediaMeta **)calloc(new_capacity, sizeof(IjkMediaMeta *));
+        IjkMediaMeta **new_children = (IjkMediaMeta **) calloc(new_capacity,
+                                                               sizeof(IjkMediaMeta *));
         if (!new_children)
             return;
 
         memcpy(new_children, meta->children, meta->children_capacity * sizeof(IjkMediaMeta *));
         free(meta->children);
-        meta->children          = new_children;
+        meta->children = new_children;
         meta->children_capacity = new_capacity;
     }
 
@@ -135,24 +129,21 @@ void ijkmeta_append_child_l(IjkMediaMeta *meta, IjkMediaMeta *child)
     meta->children_count++;
 }
 
-void ijkmeta_set_int64_l(IjkMediaMeta *meta, const char *name, int64_t value)
-{
+void ijkmeta_set_int64_l(IjkMediaMeta *meta, const char *name, int64_t value) {
     if (!meta)
         return;
 
     av_dict_set_int(&meta->dict, name, value, 0);
 }
 
-void ijkmeta_set_string_l(IjkMediaMeta *meta, const char *name, const char *value)
-{
+void ijkmeta_set_string_l(IjkMediaMeta *meta, const char *name, const char *value) {
     if (!meta)
         return;
 
     av_dict_set(&meta->dict, name, value, 0);
 }
 
-static int64_t get_bit_rate(AVCodecParameters *codecpar)
-{
+static int64_t get_bit_rate(AVCodecParameters *codecpar) {
     int64_t bit_rate;
     int bits_per_sample;
 
@@ -165,7 +156,8 @@ static int64_t get_bit_rate(AVCodecParameters *codecpar)
             break;
         case AVMEDIA_TYPE_AUDIO:
             bits_per_sample = av_get_bits_per_sample(codecpar->codec_id);
-            bit_rate = bits_per_sample ? codecpar->sample_rate * codecpar->channels * bits_per_sample : codecpar->bit_rate;
+            bit_rate = bits_per_sample ? codecpar->sample_rate * codecpar->ch_layout.nb_channels *
+                                         bits_per_sample : codecpar->bit_rate;
             break;
         default:
             bit_rate = 0;
@@ -174,8 +166,7 @@ static int64_t get_bit_rate(AVCodecParameters *codecpar)
     return bit_rate;
 }
 
-void ijkmeta_set_avformat_context_l(IjkMediaMeta *meta, AVFormatContext *ic)
-{
+void ijkmeta_set_avformat_context_l(IjkMediaMeta *meta, AVFormatContext *ic) {
     if (!meta || !ic)
         return;
 
@@ -219,7 +210,8 @@ void ijkmeta_set_avformat_context_l(IjkMediaMeta *meta, AVFormatContext *ic)
                     ijkmeta_set_string_l(stream_meta, IJKM_KEY_CODEC_LONG_NAME, codec->long_name);
                 ijkmeta_set_int64_l(stream_meta, IJKM_KEY_CODEC_LEVEL, codecpar->level);
                 if (codecpar->format != AV_PIX_FMT_NONE)
-                    ijkmeta_set_string_l(stream_meta, IJKM_KEY_CODEC_PIXEL_FORMAT, av_get_pix_fmt_name(codecpar->format));
+                    ijkmeta_set_string_l(stream_meta, IJKM_KEY_CODEC_PIXEL_FORMAT,
+                                         av_get_pix_fmt_name(codecpar->format));
             }
         }
 
@@ -237,8 +229,10 @@ void ijkmeta_set_avformat_context_l(IjkMediaMeta *meta, AVFormatContext *ic)
                 if (codecpar->height > 0)
                     ijkmeta_set_int64_l(stream_meta, IJKM_KEY_HEIGHT, codecpar->height);
                 if (st->sample_aspect_ratio.num > 0 && st->sample_aspect_ratio.den > 0) {
-                    ijkmeta_set_int64_l(stream_meta, IJKM_KEY_SAR_NUM, codecpar->sample_aspect_ratio.num);
-                    ijkmeta_set_int64_l(stream_meta, IJKM_KEY_SAR_DEN, codecpar->sample_aspect_ratio.den);
+                    ijkmeta_set_int64_l(stream_meta, IJKM_KEY_SAR_NUM,
+                                        codecpar->sample_aspect_ratio.num);
+                    ijkmeta_set_int64_l(stream_meta, IJKM_KEY_SAR_DEN,
+                                        codecpar->sample_aspect_ratio.den);
                 }
 
                 if (st->avg_frame_rate.num > 0 && st->avg_frame_rate.den > 0) {
@@ -256,8 +250,9 @@ void ijkmeta_set_avformat_context_l(IjkMediaMeta *meta, AVFormatContext *ic)
 
                 if (codecpar->sample_rate)
                     ijkmeta_set_int64_l(stream_meta, IJKM_KEY_SAMPLE_RATE, codecpar->sample_rate);
-                if (codecpar->channel_layout)
-                    ijkmeta_set_int64_l(stream_meta, IJKM_KEY_CHANNEL_LAYOUT, codecpar->channel_layout);
+                if (codecpar->ch_layout.u.mask)
+                    ijkmeta_set_int64_l(stream_meta, IJKM_KEY_CHANNEL_LAYOUT,
+                                        codecpar->ch_layout.u.mask);
                 break;
             }
             case AVMEDIA_TYPE_SUBTITLE: {
@@ -282,8 +277,7 @@ void ijkmeta_set_avformat_context_l(IjkMediaMeta *meta, AVFormatContext *ic)
         ijkmeta_destroy_p(&stream_meta);
 }
 
-const char *ijkmeta_get_string_l(IjkMediaMeta *meta, const char *name)
-{
+const char *ijkmeta_get_string_l(IjkMediaMeta *meta, const char *name) {
     if (!meta || !meta->dict || !name)
         return NULL;
 
@@ -294,8 +288,7 @@ const char *ijkmeta_get_string_l(IjkMediaMeta *meta, const char *name)
     return entry->value;
 }
 
-int64_t ijkmeta_get_int64_l(IjkMediaMeta *meta, const char *name, int64_t defaultValue)
-{
+int64_t ijkmeta_get_int64_l(IjkMediaMeta *meta, const char *name, int64_t defaultValue) {
     if (!meta || !meta->dict)
         return defaultValue;
 
@@ -306,16 +299,14 @@ int64_t ijkmeta_get_int64_l(IjkMediaMeta *meta, const char *name, int64_t defaul
     return atoll(entry->value);
 }
 
-size_t ijkmeta_get_children_count_l(IjkMediaMeta *meta)
-{
+size_t ijkmeta_get_children_count_l(IjkMediaMeta *meta) {
     if (!meta || !meta->children)
         return 0;
 
     return meta->children_count;
 }
 
-IjkMediaMeta *ijkmeta_get_child_l(IjkMediaMeta *meta, size_t index)
-{
+IjkMediaMeta *ijkmeta_get_child_l(IjkMediaMeta *meta, size_t index) {
     if (!meta)
         return NULL;
 

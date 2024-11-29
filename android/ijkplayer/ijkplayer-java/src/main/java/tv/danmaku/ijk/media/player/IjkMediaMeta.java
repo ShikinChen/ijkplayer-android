@@ -43,7 +43,7 @@ public class IjkMediaMeta {
     public static final String IJKM_KEY_SAR_DEN = "sar_den";
     // stream: audio
     public static final String IJKM_KEY_SAMPLE_RATE = "sample_rate";
-    public static final String IJKM_KEY_CHANNEL_LAYOUT = "channel_layout";
+    public static final String IJKM_KEY_CHANNEL_LAYOUT = "ch_layout";
 
     public static final String IJKM_KEY_STREAMS = "streams";
 

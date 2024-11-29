@@ -33,11 +33,11 @@ foreach (FFMPEG_LIB_FILE ${FFMPEG_LIB_FILES})
         list(APPEND FFMPEG_LIBS ${LIB_NAME})
 
         string(REGEX REPLACE ".*\\.(.*)" "\\1" EXT ${FFMPEG_LIB_FILE})
-        if(EXT STREQUAL "a")
+        if (EXT STREQUAL "a")
             add_library(${LIB_NAME} STATIC IMPORTED)
-        elseif(EXT STREQUAL "so")
+        elseif (EXT STREQUAL "so")
             add_library(${LIB_NAME} SHARED IMPORTED)
-        endif()
+        endif ()
 
         set_target_properties(${LIB_NAME}
                 PROPERTIES
@@ -46,6 +46,10 @@ foreach (FFMPEG_LIB_FILE ${FFMPEG_LIB_FILES})
 endforeach ()
 include_directories(${FFMPEG_ABI_PATH}/include)
 target_link_libraries(swscale INTERFACE avutil)
+
+find_library(media-lib mediandk REQUIRED)
+target_link_libraries(avcodec INTERFACE ${media-lib})
+
 #set_target_properties(${FFMPEG_LIB_NAME}
 #        PROPERTIES INTERFACE_INCLUDE_DIRECTORIES
 #        ${FFMPEG_ABI_PATH}/include

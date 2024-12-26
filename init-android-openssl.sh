@@ -16,29 +16,18 @@
 # limitations under the License.
 #
 
-#IJK_OPENSSL_UPSTREAM=https://github.com/openssl/openssl
-IJK_OPENSSL_UPSTREAM=https://github.com/Bilibili/openssl.git
-IJK_OPENSSL_FORK=https://github.com/Bilibili/openssl.git
-IJK_OPENSSL_COMMIT=OpenSSL_1_0_2q
-IJK_OPENSSL_LOCAL_REPO=extra/openssl
+CURRENT_DIR=$(dirname "$(readlink -f "$0")")
+IJK_OPENSSL_UPSTREAM=https://github.com/openssl/openssl.git
+IJK_OPENSSL_FORK=https://github.com/openssl/openssl.git
+IJK_OPENSSL_COMMIT=openssl-3.2
+IJK_OPENSSL_LOCAL_REPO=$CURRENT_DIR/extra/openssl
 
 set -e
-TOOLS=tools
+TOOLS=$CURRENT_DIR/tools
 
 echo "== pull openssl base =="
 sh $TOOLS/pull-repo-base.sh $IJK_OPENSSL_UPSTREAM $IJK_OPENSSL_LOCAL_REPO
-
-function pull_fork()
-{
-    echo "== pull openssl fork $1 =="
-    sh $TOOLS/pull-repo-ref.sh $IJK_OPENSSL_FORK android/contrib/openssl-$1 ${IJK_OPENSSL_LOCAL_REPO}
-    cd android/contrib/openssl-$1
-    git checkout ${IJK_OPENSSL_COMMIT} -B ijkplayer
-    cd -
-}
-
-pull_fork "armv5"
-pull_fork "armv7a"
-pull_fork "arm64"
-pull_fork "x86"
-pull_fork "x86_64"
+cd ${IJK_OPENSSL_LOCAL_REPO}
+git checkout ${IJK_OPENSSL_COMMIT}
+sed -i 's|which("clang") =~ m|which("clang") !=~ m|' ./Configurations/15-android.conf
+cd -

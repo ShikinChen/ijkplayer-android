@@ -2,7 +2,7 @@
 
 ## <mark>为了学习 aosp 已经替换 Ubuntu 主开发系统(主要 mac book pro 太贵),脚本适配 Ubuntu 为主,MacOS 尽量适配</mark>
 
-### <mark>有升级到FFmpeg 7.1的分支,因为7.1的api变化有点大,对源码修改比较大,修改后不知道稳定如何,所以单独开一个分支,需要的请自行切换或者拉取</mark>
+### <mark>有升级到 FFmpeg 7.1 的分支,因为 7.1 的 api 变化有点大,对源码修改比较大,修改后不知道稳定如何,所以单独开一个分支,需要的请自行切换或者拉取</mark>
 
 ```shell
 git clone https://github.com/ShikinChen/ijkplayer-android --recursive -b ijk0.8.8--ff7.1
@@ -17,27 +17,58 @@ git clone https://github.com/ShikinChen/ijkplayer-android --recursive -b ijk0.8.
 - Android Studio 2023.1.1 Patch 2
 - Gradle 7.2
 - Xcode 12.5.1
+- Python 3.9.x
 - [HomeBrew](http://brew.sh)
 - ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 - brew install git
 
 ### 构建前配置
 
-MacOS
+#### MacOS
 
 ```shell
 # install homebrew, git, yasm
 ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 brew install git
 brew install yasm
+brew install pyenv
 ```
 
-Ubuntu
+配置 pyenv
+
+```shell
+#编辑环境变量文件
+vim ~/.bash_profile
+#追加下面内容
+export PYENV_ROOT=/usr/local/var/pyenv
+if which pyenv > /dev/null; then eval "$(pyenv init -)"; fi
+eval "$(pyenv init --path)"
+```
+
+#### Ubuntu
 
 ```shell
 # 将Shell的解释器改为dash,执行dpkg-reconfigure dash命令，然后选择no
 sudo dpkg-reconfigure dash
 sudo apt install -y ninja-build git
+curl -L https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-installer | bash
+```
+
+配置 pyenv
+
+```shell
+#编辑环境变量文件
+vim ~/.bashrc
+#追加下面内容
+export PYENV_ROOT="$HOME/.pyenv"
+[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init -)"
+```
+
+#### 安装 python 3.9.19
+
+```shell
+pyenv install 3.9.19
 ```
 
 终端环境变量配置
@@ -60,6 +91,13 @@ git clone https://github.com/ShikinChen/ijkplayer-android --recursive
 ```shell
 cd ijkplayer-android
 git submodule update --init --remote --recursive --progress
+```
+
+#### 如果需要 openssl,执行下面脚本拉取 openssl,后面会自动进行链接到 FFmpeg(可选)
+
+```shell
+cd ijkplayer-android
+./init-android-openssl.sh
 ```
 
 ### 构建和导入

@@ -1,13 +1,15 @@
 cmake_minimum_required(VERSION 3.4.1)
 project("ijkffmpeg")
 
+find_library(mediandk-lib mediandk)
+
 add_library(${FFMPEG_LIB_NAME} INTERFACE)
 target_include_directories(${FFMPEG_LIB_NAME}
         INTERFACE
         ${FFMPEG_ABI_PATH}/include
 )
 target_link_libraries(${FFMPEG_LIB_NAME} INTERFACE
-        ${FFMPEG_LIBS})
+        ${FFMPEG_LIBS} ${mediandk-lib})
 
 #TODO 打算配置将静态库打包成动态库ffmpeg,出现-fPIC问题暂时注释后面看能否解决       
 # set(FFMPEG_NAME ffmpeg)

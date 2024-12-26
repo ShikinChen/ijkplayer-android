@@ -166,8 +166,9 @@ if [ ! -f "$FF_TOOLCHAIN_TOUCH" ]; then
     cd -
 fi
 
-FF_LD=${FF_TOOLCHAIN_PATH_BIN}/${FF_CROSS_PREFIX}-ld
-if [[ ! -d "$FF_LD" ]]; then
+FF_LD=${FF_TOOLCHAIN_PATH_BIN}/ld
+echo FF_LD:${FF_LD}
+if [[ ! -f "$FF_LD" ]]; then
     if [[ ! -L "$FF_LD" ]]; then
         cd $FF_TOOLCHAIN_PATH_BIN && ln -s ${FF_CROSS_PREFIX}-ld ld
         cd -

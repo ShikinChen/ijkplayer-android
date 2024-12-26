@@ -32,7 +32,7 @@ FF_BUILD_OPT=$2
 echo "FF_ARCH=$FF_ARCH"
 echo "FF_BUILD_OPT=$FF_BUILD_OPT"
 if [ -z "$FF_ARCH" ]; then
-    echo "You must specific an architecture 'arm, armv7a, x86, ...'."
+    echo "You must specific an architecture 'armv7a, x86, ...'."
     echo ""
     exit 1
 fi
@@ -159,11 +159,12 @@ if [ ! -d $FF_SOURCE ]; then
     exit 1
 fi
 
-FF_TOOLCHAIN_PATH=$FF_BUILD_ROOT/build/$FF_BUILD_NAME/toolchain
+FF_TOOLCHAIN_PATH=$FF_BUILD_ROOT/build/toolchain-$FF_ARCH
 FF_MAKE_TOOLCHAIN_FLAGS="$FF_MAKE_TOOLCHAIN_FLAGS --install-dir=$FF_TOOLCHAIN_PATH"
 
 FF_SYSROOT=$FF_TOOLCHAIN_PATH/sysroot
 FF_PREFIX=$FF_BUILD_ROOT/build/$FF_BUILD_NAME/output
+
 FF_DEP_OPENSSL_INC=$FF_BUILD_ROOT/build/$FF_BUILD_NAME_OPENSSL/output/include
 FF_DEP_OPENSSL_LIB=$FF_BUILD_ROOT/build/$FF_BUILD_NAME_OPENSSL/output/lib
 FF_DEP_LIBSOXR_INC=$FF_BUILD_ROOT/build/$FF_BUILD_NAME_LIBSOXR/output/include
@@ -175,7 +176,7 @@ CYGWIN_NT-*)
     FF_PREFIX="$(cygpath -am $FF_PREFIX)"
     ;;
 esac
-if [ ! -d "$FF_PREFIX" ]; then
+if [ -d "$FF_PREFIX" ]; then
     rm -rf $FF_PREFIX
 fi
 mkdir -p $FF_PREFIX
@@ -212,7 +213,7 @@ echo "[*] check ffmpeg env"
 echo "--------------------"
 FF_TOOLCHAIN_PATH_BIN=$FF_TOOLCHAIN_PATH/bin
 export PATH=$FF_TOOLCHAIN_PATH_BIN:$PATH
-#export CC="ccache ${FF_CROSS_PREFIX}-gcc"
+
 export CC=${FF_TOOLCHAIN_PATH_BIN}/${FF_CROSS_PREFIX}-${FF_CC}
 export LD=${FF_TOOLCHAIN_PATH_BIN}/${FF_CROSS_PREFIX}-ld
 export AR=${FF_TOOLCHAIN_PATH_BIN}/${FF_CROSS_PREFIX}-ar
@@ -253,6 +254,13 @@ source $FF_BUILD_ROOT/../../config/module.sh
 
 #--------------------
 # with openssl
+
+OPENSSL_SOURCE=$FF_BUILD_ROOT/../../extra/openssl
+
+if [ -d $OPENSSL_SOURCE ]; then
+    $CURRENT_DIR/../compile-openssl.sh $FF_ARCH
+fi
+
 if [ -f "${FF_DEP_OPENSSL_LIB}/libssl.a" ]; then
     echo "OpenSSL detected"
     # FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-nonfree"
@@ -338,70 +346,3 @@ make $FF_MAKE_FLAGS >/dev/null
 make install
 mkdir -p $FF_PREFIX/include/libffmpeg
 cp -f config.h $FF_PREFIX/include/libffmpeg/config.h
-
-# #--------------------
-# echo ""
-# echo "--------------------"
-# echo "[*] link ffmpeg"
-# echo "--------------------"
-# echo $FF_EXTRA_LDFLAGS
-
-# FF_C_OBJ_FILES=
-# FF_ASM_OBJ_FILES=
-# for MODULE_DIR in $FF_MODULE_DIRS; do
-#     C_OBJ_FILES="$MODULE_DIR/*.o"
-#     if ls $C_OBJ_FILES 1>/dev/null 2>&1; then
-#         echo "link $MODULE_DIR/*.o"
-#         FF_C_OBJ_FILES="$FF_C_OBJ_FILES $C_OBJ_FILES"
-#     fi
-
-#     for ASM_SUB_DIR in $FF_ASSEMBLER_SUB_DIRS; do
-#         ASM_OBJ_FILES="$MODULE_DIR/$ASM_SUB_DIR/*.o"
-#         if ls $ASM_OBJ_FILES 1>/dev/null 2>&1; then
-#             echo "link $MODULE_DIR/$ASM_SUB_DIR/*.o"
-#             FF_ASM_OBJ_FILES="$FF_ASM_OBJ_FILES $ASM_OBJ_FILES"
-#         fi
-#     done
-# done
-
-# $CC -lm -lz -shared --sysroot=$FF_SYSROOT -Wl,--no-undefined -Wl,-z,noexecstack $FF_EXTRA_LDFLAGS \
-#     -Wl,-soname,libijkffmpeg.so \
-#     $FF_C_OBJ_FILES \
-#     $FF_ASM_OBJ_FILES \
-#     $FF_DEP_LIBS \
-#     -o $FF_PREFIX/libijkffmpeg.so
-
-# mysedi() {
-#     f=$1
-#     exp=$2
-#     n=$(basename $f)
-#     cp $f /tmp/$n
-#     sed $exp /tmp/$n >$f
-#     rm /tmp/$n
-# }
-
-# echo ""
-# echo "--------------------"
-# echo "[*] create files for shared ffmpeg"
-# echo "--------------------"
-# rm -rf $FF_PREFIX/shared
-# mkdir -p $FF_PREFIX/shared/lib/pkgconfig
-# ln -s $FF_PREFIX/include $FF_PREFIX/shared/include
-# ln -s $FF_PREFIX/libijkffmpeg.so $FF_PREFIX/shared/lib/libijkffmpeg.so
-# cp $FF_PREFIX/lib/pkgconfig/*.pc $FF_PREFIX/shared/lib/pkgconfig
-# for f in $FF_PREFIX/lib/pkgconfig/*.pc; do
-#     # in case empty dir
-#     if [ ! -f $f ]; then
-#         continue
-#     fi
-#     cp $f $FF_PREFIX/shared/lib/pkgconfig
-#     f=$FF_PREFIX/shared/lib/pkgconfig/$(basename $f)
-#     # OSX sed doesn't have in-place(-i)
-#     mysedi $f 's/\/output/\/output\/shared/g'
-#     mysedi $f 's/-lavcodec/-lijkffmpeg/g'
-#     mysedi $f 's/-lavfilter/-lijkffmpeg/g'
-#     mysedi $f 's/-lavformat/-lijkffmpeg/g'
-#     mysedi $f 's/-lavutil/-lijkffmpeg/g'
-#     mysedi $f 's/-lswresample/-lijkffmpeg/g'
-#     mysedi $f 's/-lswscale/-lijkffmpeg/g'
-# done

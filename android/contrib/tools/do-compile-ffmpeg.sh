@@ -263,13 +263,13 @@ source $FF_BUILD_ROOT/../../config/module.sh
 
 OPENSSL_SOURCE=$FF_BUILD_ROOT/../../extra/openssl
 
+export CFLAGS=""
+export CPPFLAGS=""
+export LDFLAGS=""
+
 if [ -d $OPENSSL_SOURCE ]; then
     $CURRENT_DIR/../compile-openssl.sh $FF_ARCH
 fi
-
-export CPPFLAGS=""
-export LDFLAGS=""
-export CFLAGS=""
 
 if [ -f "${FF_DEP_OPENSSL_LIB}/libssl.a" ]; then
     echo "OpenSSL detected"
@@ -277,13 +277,11 @@ if [ -f "${FF_DEP_OPENSSL_LIB}/libssl.a" ]; then
     # FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-version3"
     FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-openssl"
 
-    FF_CFLAGS="$FF_CFLAGS -I${FF_DEP_OPENSSL_INC}"
-    FF_DEP_LIBS="$FF_DEP_LIBS -L${FF_DEP_OPENSSL_LIB} -lssl -lcrypto"
+    FF_CFLAGS="$FF_CFLAGS -I${FF_DEP_OPENSSL_INC} "
+    FF_DEP_LIBS="$FF_DEP_LIBS -lssl -lcrypto"
 
     export CPPFLAGS="-I${FF_DEP_OPENSSL_INC}"
     export LDFLAGS="-L${FF_DEP_OPENSSL_LIB} -lssl -lcrypto -v"
-    # echo "CFLAGS=$CFLAGS"
-    # echo "LDFLAGS=$LDFLAGS"
 fi
 
 if [ -f "${FF_DEP_LIBSOXR_LIB}/libsoxr.a" ]; then

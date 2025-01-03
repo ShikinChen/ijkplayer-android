@@ -214,8 +214,14 @@ echo "--------------------"
 FF_TOOLCHAIN_PATH_BIN=$FF_TOOLCHAIN_PATH/bin
 export PATH=$FF_TOOLCHAIN_PATH_BIN:$PATH
 
+NDK_MAJOR=$(echo "$IJK_NDK_REL" | cut -d'.' -f1)
+if [ "$NDK_MAJOR" -lt 22 ]; then
+    export LD=${FF_TOOLCHAIN_PATH_BIN}/${FF_CROSS_PREFIX}-ld
+else
+    export LD=${FF_TOOLCHAIN_PATH_BIN}/ld
+fi
+
 export CC=${FF_TOOLCHAIN_PATH_BIN}/${FF_CROSS_PREFIX}-${FF_CC}
-export LD=${FF_TOOLCHAIN_PATH_BIN}/${FF_CROSS_PREFIX}-ld
 export AR=${FF_TOOLCHAIN_PATH_BIN}/${FF_CROSS_PREFIX}-ar
 export STRIP=${FF_TOOLCHAIN_PATH_BIN}/${FF_CROSS_PREFIX}-strip
 NM=${FF_TOOLCHAIN_PATH_BIN}/${FF_CROSS_PREFIX}-nm
@@ -261,13 +267,23 @@ if [ -d $OPENSSL_SOURCE ]; then
     $CURRENT_DIR/../compile-openssl.sh $FF_ARCH
 fi
 
+export CPPFLAGS=""
+export LDFLAGS=""
+export CFLAGS=""
+
 if [ -f "${FF_DEP_OPENSSL_LIB}/libssl.a" ]; then
     echo "OpenSSL detected"
-    # FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-nonfree"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-nonfree"
+    # FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-version3"
     FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-openssl"
 
     FF_CFLAGS="$FF_CFLAGS -I${FF_DEP_OPENSSL_INC}"
     FF_DEP_LIBS="$FF_DEP_LIBS -L${FF_DEP_OPENSSL_LIB} -lssl -lcrypto"
+
+    export CPPFLAGS="-I${FF_DEP_OPENSSL_INC}"
+    export LDFLAGS="-L${FF_DEP_OPENSSL_LIB} -lssl -lcrypto -v"
+    # echo "CFLAGS=$CFLAGS"
+    # echo "LDFLAGS=$LDFLAGS"
 fi
 
 if [ -f "${FF_DEP_LIBSOXR_LIB}/libsoxr.a" ]; then
@@ -294,6 +310,7 @@ FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-vulkan"
 FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-shared"
 FF_CFG_FLAGS="$FF_CFG_FLAGS --enable-static"
 FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-doc"
+FF_CFG_FLAGS="$FF_CFG_FLAGS --sysroot=$FF_SYSROOT"
 
 # FF_CFG_FLAGS="$FF_CFG_FLAGS --disable-symver"
 
@@ -318,7 +335,7 @@ debug)
     ;;
 esac
 
-FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS -lm"
+FF_EXTRA_LDFLAGS="-lm $FF_EXTRA_LDFLAGS"
 
 #--------------------
 echo ""
@@ -333,7 +350,7 @@ fi
 which $CC
 ./configure $FF_CFG_FLAGS \
     --extra-cflags="$FF_CFLAGS $FF_EXTRA_CFLAGS" \
-    --extra-ldflags="$FF_DEP_LIBS $FF_EXTRA_LDFLAGS"
+    --extra-ldflags="$FF_EXTRA_LDFLAGS $FF_DEP_LIBS"
 # make clean
 
 # --------------------

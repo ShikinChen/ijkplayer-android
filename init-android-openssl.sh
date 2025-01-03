@@ -26,8 +26,14 @@ set -e
 TOOLS=$CURRENT_DIR/tools
 
 echo "== pull openssl base =="
-sh $TOOLS/pull-repo-base.sh $IJK_OPENSSL_UPSTREAM $IJK_OPENSSL_LOCAL_REPO
+if [ ! -d $IJK_OPENSSL_LOCAL_REPO ]; then
+    sh $TOOLS/pull-repo-base.sh $IJK_OPENSSL_UPSTREAM $IJK_OPENSSL_LOCAL_REPO
+fi
 cd ${IJK_OPENSSL_LOCAL_REPO}
 git checkout ${IJK_OPENSSL_COMMIT}
-sed -i 's|which("clang") =~ m|which("clang") !=~ m|' ./Configurations/15-android.conf
+FILE_NAME=""
+if [ "$(uname)" == "Darwin" ]; then
+    FILE_NAME=".bak"
+fi
+sed -i $FILE_NAME 's|which("clang") =~ m|which("clang") !=~ m|' ./Configurations/15-android.conf
 cd -

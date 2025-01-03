@@ -95,6 +95,8 @@ git submodule update --init --remote --recursive --progress
 
 #### 如果需要 openssl,执行下面脚本拉取 openssl,后面会自动进行链接到 FFmpeg(可选)
 
+<mark>在 MacOS 的 ndk 27 以下没办法进行 ld 引入 ssl 和 crypto 库,导致在 FFmpeg 编译的检测时候出现错误,而 ndk 27 是没办法编译 armv7a 版本,如果需要编译 armv7a 版本需要在 Ubuntu 进行</mark>
+
 ```shell
 cd ijkplayer-android
 ./init-android-openssl.sh

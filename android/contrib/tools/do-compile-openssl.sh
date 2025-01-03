@@ -17,7 +17,7 @@
 #
 
 #--------------------
-set -e
+# set -e
 
 if [ -z "$ANDROID_NDK" ]; then
     echo "You must define ANDROID_NDK before starting."
@@ -167,10 +167,12 @@ if [ ! -f "$FF_TOOLCHAIN_TOUCH" ]; then
 fi
 
 FF_LD=${FF_TOOLCHAIN_PATH_BIN}/ld
-echo FF_LD:${FF_LD}
+
+which ld
 if [[ ! -f "$FF_LD" ]]; then
     if [[ ! -L "$FF_LD" ]]; then
-        cd $FF_TOOLCHAIN_PATH_BIN && ln -s ${FF_CROSS_PREFIX}-ld ld
+        cd $FF_TOOLCHAIN_PATH_BIN
+        ln -s ${FF_CROSS_PREFIX}-ld ld || true
         cd -
     fi
 fi
@@ -219,12 +221,27 @@ SYSROOT=${FF_TOOLCHAIN_PATH}/sysroot
 
 FF_CFG_FLAGS="$FF_CFG_FLAGS zlib-dynamic"
 FF_CFG_FLAGS="$FF_CFG_FLAGS no-shared"
-FF_CFG_FLAGS="$FF_CFG_FLAGS --prefix=$FF_PREFIX"
+FF_CFG_FLAGS="$FF_CFG_FLAGS --prefix=${FF_PREFIX}"
 FF_CFG_FLAGS="$FF_CFG_FLAGS --sysroot=${SYSROOT}"
+FF_CFG_FLAGS="$FF_CFG_FLAGS --openssldir=${FF_PREFIX}"
 # FF_CFG_FLAGS="$FF_CFG_FLAGS --cross-compile-prefix=${FF_TOOLCHAIN_PATH_BIN}/${FF_CROSS_PREFIX}-"
 FF_CFG_FLAGS="$FF_CFG_FLAGS $FF_PLATFORM_CFG_FLAGS"
+FF_CFG_FLAGS="$FF_CFG_FLAGS no-tests"
+FF_CFG_FLAGS="$FF_CFG_FLAGS no-apps"
+# FF_CFG_FLAGS="$FF_CFG_FLAGS no-legacy"
 # FF_CFG_FLAGS="$FF_CFG_FLAGS CC=$FF_CC"
 FF_CFG_FLAGS="$FF_CFG_FLAGS -D__ANDROID_API__=$FF_ANDROID_PLATFORM"
+
+# FF_DEP_OPENSSL_INC=$FF_SOURCE/include
+# FF_DEP_OPENSSL_LIB=$FF_SOURCE
+# export CFLAGS="-I${FF_DEP_OPENSSL_INC}"
+# export LDFLAGS="-L${FF_DEP_OPENSSL_LIB}"
+
+NDK_MAJOR=$(echo "$IJK_NDK_REL" | cut -d'.' -f1)
+if [ "$NDK_MAJOR" -lt 27 ]; then
+    FF_CFG_FLAGS="$FF_CFG_FLAGS no-quic"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS no-legacy"
+fi
 
 #--------------------
 echo ""

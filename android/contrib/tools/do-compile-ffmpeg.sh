@@ -121,7 +121,7 @@ elif [ "$FF_ARCH" = "x86_64" ]; then
     FF_CROSS_PREFIX=x86_64-linux-android
     FF_TOOLCHAIN_NAME=${FF_CROSS_PREFIX}-${FF_GCC_64_VER}
 
-    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=x86_64 --disable-neon --disable-asm --disable-x86asm"
+    FF_CFG_FLAGS="$FF_CFG_FLAGS --arch=x86_64 --disable-neon --disable-asm --disable-x86asm --disable-mmx --disable-mmxext --disable-sse"
 
     FF_EXTRA_CFLAGS="$FF_EXTRA_CFLAGS"
     FF_EXTRA_LDFLAGS="$FF_EXTRA_LDFLAGS"
